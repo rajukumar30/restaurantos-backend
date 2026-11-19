@@ -19,6 +19,22 @@ The API is a Java 21 / Spring Boot service. It can be deployed to any Docker-cap
 
 Do not commit production secrets or place them in frontend environment variables.
 
+## Render deployment (Neon PostgreSQL)
+
+A Render Blueprint is included at the repository root in `render.yaml`. In Render, create a new Blueprint and connect this repository. Select the `chore/bootstrap` branch for the initial preview deployment. The Blueprint builds the existing Java 21 Dockerfile, uses the Singapore region, and checks `/actuator/health`.
+
+When prompted, provide these values in Render's secure environment-variable form:
+
+- `DATABASE_URL`: JDBC URL for the existing Neon database, in the form `jdbc:postgresql://<NEON_HOST>/<DATABASE_NAME>?sslmode=require`. Use the actual Neon host and the existing database name.
+- `DATABASE_USERNAME` and `DATABASE_PASSWORD`: Neon database credentials. Do not paste them into GitHub or this file.
+- `CORS_ALLOWED_ORIGINS`: exact HTTPS origin of the deployed frontend (origin only; no trailing slash or path).
+- `PLATFORM_ADMIN_EMAIL`: email for the initial platform administrator.
+- `PLATFORM_ADMIN_PASSWORD`: a unique password of at least 12 characters. Store it only in Render's secret environment settings.
+
+Render generates `JWT_SECRET` automatically. The Blueprint uses the free instance plan for an initial test; free services can spin down when idle, so expect cold starts and do not treat this as production-grade availability. Upgrade the instance before onboarding real restaurants.
+
+After deployment, verify `/actuator/health` and `/api/v1/health`, then test login, tenant onboarding, branch permissions, menu, QR lookup, order placement, and staff order updates. Do not point the live frontend at this API until those checks pass.
+
 ## Deploy steps
 
 1. Provision a managed PostgreSQL database.
