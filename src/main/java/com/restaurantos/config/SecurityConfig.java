@@ -29,7 +29,7 @@ public class SecurityConfig {
                 .formLogin(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/actuator/health", "/actuator/info", "/api/v1/health", "/api/v1/auth/login").permitAll()
+                        .requestMatchers("/actuator/health", "/actuator/info", "/api/v1/health", "/api/v1/auth/login", "/api/v1/public/qr/**").permitAll()
                         .requestMatchers("/api/v1/platform/**").hasAuthority("PLATFORM_ADMIN")
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class).build();
