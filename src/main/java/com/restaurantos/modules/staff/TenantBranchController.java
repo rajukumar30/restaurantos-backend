@@ -33,8 +33,9 @@ public class TenantBranchController {
                     JOIN user_roles ur ON ur.tenant_id = tu.tenant_id AND ur.tenant_user_id = tu.id
                     JOIN role_permissions rp ON rp.role_id = ur.role_id
                     JOIN permissions p ON p.id = rp.permission_id
+                    JOIN branches b ON b.id = ur.branch_id AND b.tenant_id = ur.tenant_id
                     WHERE tu.tenant_id = ? AND tu.user_id = ? AND tu.status = 'ACTIVE'
-                      AND ur.branch_id IS NOT NULL AND p.permission_key = 'branch:read'
+                      AND b.status = 'ACTIVE' AND p.permission_key = 'branch:read'
                     """, Integer.class, tenantId, userId);
             if (allowed == null || allowed == 0) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have permission to view branches.");
