@@ -1,6 +1,7 @@
 package com.restaurantos.config;
 
 import com.restaurantos.modules.auth.JwtAuthenticationFilter;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,7 +23,7 @@ import java.util.List;
 public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthenticationFilter jwtFilter,
-                                            CorsConfigurationSource corsSource) throws Exception {
+                                            @Qualifier("corsConfigurationSource") CorsConfigurationSource corsSource) throws Exception {
         return http.cors(cors -> cors.configurationSource(corsSource))
                 .csrf(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
