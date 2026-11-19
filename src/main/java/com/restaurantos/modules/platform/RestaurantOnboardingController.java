@@ -15,21 +15,17 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
-import org.springframework.beans.factory.annotation.Value;
 
 @RestController
 @RequestMapping("/api/v1/platform/restaurants")
 public class RestaurantOnboardingController {
     private final JdbcTemplate jdbc;
     private final PasswordEncoder encoder;
-    private final String baseDomain;
     private static final Set<String> RESERVED_SUBDOMAINS = Set.of("www", "admin", "api", "app", "support", "login", "mail", "status", "docs");
 
-    public RestaurantOnboardingController(JdbcTemplate jdbc, PasswordEncoder encoder,
-            @Value("${restaurantos.domains.base-domain:restaurantos.com}") String baseDomain) {
+    public RestaurantOnboardingController(JdbcTemplate jdbc, PasswordEncoder encoder) {
         this.jdbc = jdbc;
         this.encoder = encoder;
-        this.baseDomain = baseDomain.toLowerCase(Locale.ROOT).trim();
     }
 
     @PostMapping
@@ -76,7 +72,7 @@ public class RestaurantOnboardingController {
                 tenantId, tenantUserId, roleId);
 
         return ApiResponse.success("Restaurant and owner account created",
-                new RestaurantCreated(tenantId, branchId, userId, slug, subdomain, "https://" + subdomain + "." + baseDomain, "ACTIVE"));
+                new RestaurantCreated(tenantId, branchId, userId, slug, subdomain, "/r/" + slug + "/menu", "ACTIVE"));
     }
 
     private String createAvailableSubdomain(String slug) {\n        String candidate = slug;\n        if (candidate.length() > 63) candidate = candidate.substring(0, 54).replaceAll("-+$", "") + "-" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);\n        if (RESERVED_SUBDOMAINS.contains(candidate)) candidate = "restaurant-" + candidate;\n        Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM tenants WHERE subdomain = ?", Integer.class, candidate);\n        if (count != null && count > 0) candidate = candidate.substring(0, Math.min(candidate.length(), 54)).replaceAll("-+$", "") + "-" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);\n        return candidate;\n    }\n\n    private String slugify(String value) {
