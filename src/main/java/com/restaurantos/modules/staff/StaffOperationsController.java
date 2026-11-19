@@ -18,6 +18,22 @@ public class StaffOperationsController {
  private final TenantAccessService access;
  public StaffOperationsController(JdbcTemplate jdbc,TenantAccessService access){this.jdbc=jdbc;this.access=access;}
 
+ @GetMapping("/branches")
+ public ApiResponse<List<Map<String,Object>>> branches(@PathVariable UUID tenantId,Authentication auth){
+  if(auth==null||!(auth.getPrincipal() instanceof UUID userId))throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"Login required");
+  List<Map<String,Object>> rows=jdbc.queryForList("""
+   SELECT DISTINCT b.id,b.name FROM branches b
+   JOIN tenant_users tu ON tu.tenant_id=b.tenant_id AND tu.user_id=? AND tu.status='ACTIVE'
+   JOIN user_roles ur ON ur.tenant_id=tu.tenant_id AND ur.tenant_user_id=tu.id
+    AND (ur.branch_id IS NULL OR ur.branch_id=b.id)
+   JOIN role_permissions rp ON rp.role_id=ur.role_id
+   JOIN permissions p ON p.id=rp.permission_id AND p.permission_key='orders:read'
+   WHERE b.tenant_id=? AND b.status='ACTIVE'
+   ORDER BY b.name
+   """,userId,tenantId);
+  return ApiResponse.success("Accessible branches",rows);
+ }
+
  @GetMapping("/access")
  public ApiResponse<Map<String,Object>> access(@PathVariable UUID tenantId,@RequestParam UUID branchId,Authentication auth){
   access.requirePermission(auth,tenantId,branchId,"orders:read");
