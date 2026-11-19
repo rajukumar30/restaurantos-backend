@@ -35,7 +35,7 @@ public class PublicQrController {
                 """, (rs, row) -> new PublicMenu(
                 rs.getObject("table_id", UUID.class), rs.getString("table_name"),
                 rs.getObject("branch_id", UUID.class), rs.getString("branch_name"),
-                rs.getString("restaurant_name"), rs.getObject("tenant_id", UUID.class), List.of()), qrToken);
+                rs.getString("restaurant_name"), List.of()), qrToken);
         if (matches.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "This table QR code is invalid or inactive.");
         }
@@ -68,11 +68,11 @@ public class PublicQrController {
         }, table.tenantId());
         return ApiResponse.success("Public menu loaded", new PublicMenu(
                 table.tableId(), table.tableName(), table.branchId(), table.branchName(),
-                table.restaurantName(), table.tenantId(), categories));
+                table.restaurantName(), categories));
     }
 
     public record PublicMenu(UUID tableId, String tableName, UUID branchId, String branchName,
-                             String restaurantName, UUID tenantId, List<PublicCategory> categories) {}
+                             String restaurantName, List<PublicCategory> categories) {}
     public record PublicCategory(UUID id, String name, List<PublicItem> items) {}
     public record PublicItem(UUID id, String name, String description, java.math.BigDecimal price,
                              String dietaryType, int prepTimeMinutes) {}
