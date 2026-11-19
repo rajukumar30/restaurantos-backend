@@ -109,7 +109,8 @@ public class OrderController {
         List<OrderSummary> orders = jdbc.query("""
                 SELECT o.id, o.order_number, o.status, o.total_amount, o.created_at,
                        rt.display_name AS table_name, COUNT(oi.id) AS line_count,
-                       COALESCE(SUM(oi.quantity), 0) AS item_count
+                       COALESCE(SUM(oi.quantity), 0) AS item_count,
+                       COALESCE(string_agg(oi.item_name || ' × ' || oi.quantity, ', ' ORDER BY oi.created_at), '') AS items_summary
                 FROM restaurant_orders o
                 JOIN restaurant_tables rt ON rt.tenant_id = o.tenant_id AND rt.id = o.table_id
                 LEFT JOIN restaurant_order_items oi ON oi.tenant_id = o.tenant_id AND oi.order_id = o.id
@@ -121,7 +122,8 @@ public class OrderController {
                 rs.getObject("id", UUID.class), rs.getString("order_number"),
                 rs.getString("table_name"), rs.getString("status"),
                 rs.getBigDecimal("total_amount"), rs.getInt("line_count"),
-                rs.getInt("item_count"), rs.getTimestamp("created_at").toInstant()), tenantId, branchId);
+                rs.getInt("item_count"), rs.getString("items_summary"),
+                rs.getTimestamp("created_at").toInstant()), tenantId, branchId);
         return ApiResponse.success("Orders loaded", orders);
     }
 
@@ -157,7 +159,7 @@ public class OrderController {
     public record OrderReceipt(UUID orderId, String orderNumber, String tableName,
                                BigDecimal totalAmount, String status) {}
     public record OrderSummary(UUID id, String orderNumber, String tableName, String status,
-                               BigDecimal totalAmount, int lineCount, int itemCount,
+                               BigDecimal totalAmount, int lineCount, int itemCount, String itemsSummary,
                                java.time.Instant createdAt) {}
     public record OrderStatusUpdated(UUID orderId, String status) {}
     private record QrTable(UUID tableId, UUID tenantId, UUID branchId, String displayName) {}
