@@ -25,5 +25,5 @@ CROSS JOIN permissions p
 WHERE r.role_key = 'OWNER' AND r.tenant_id IS NOT NULL
 ON CONFLICT DO NOTHING;
 
-CREATE INDEX idx_user_roles_tenant_role ON user_roles(tenant_id, role_id);
-CREATE INDEX idx_role_permissions_permission ON role_permissions(permission_id);
+CREATE INDEX IF NOT EXISTS idx_user_roles_tenant_role ON user_roles(tenant_id, role_id);
+CREATE INDEX IF NOT EXISTS idx_role_permissions_permission ON role_permissions(permission_id);
