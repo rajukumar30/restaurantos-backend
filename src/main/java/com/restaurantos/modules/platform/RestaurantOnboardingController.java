@@ -60,6 +60,11 @@ public class RestaurantOnboardingController {
                 branchUserId, tenantId, branchId, tenantUserId);
         jdbc.update("INSERT INTO roles (id,tenant_id,role_key,display_name,is_system) VALUES (?,?,'OWNER','Restaurant Owner',true)",
                 roleId, tenantId);
+        jdbc.update("""
+                INSERT INTO role_permissions (role_id, permission_id)
+                SELECT ?, id FROM permissions
+                ON CONFLICT DO NOTHING
+                """, roleId);
         jdbc.update("INSERT INTO user_roles (tenant_id,tenant_user_id,role_id,branch_id) VALUES (?,?,?,NULL)",
                 tenantId, tenantUserId, roleId);
 
