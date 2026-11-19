@@ -41,6 +41,21 @@ public class TenantAccessService {
         return userId;
     }
 
+    public boolean hasTenantWidePermission(Authentication authentication, UUID tenantId, String permission) {
+        if (authentication == null || !(authentication.getPrincipal() instanceof UUID userId)) return false;
+        Integer count = jdbc.queryForObject("""
+                SELECT COUNT(*)
+                FROM tenant_users tu
+                JOIN user_roles ur ON ur.tenant_id = tu.tenant_id AND ur.tenant_user_id = tu.id
+                JOIN role_permissions rp ON rp.role_id = ur.role_id
+                JOIN permissions p ON p.id = rp.permission_id
+                JOIN tenants t ON t.id = tu.tenant_id
+                WHERE tu.tenant_id = ? AND tu.user_id = ? AND tu.status = 'ACTIVE'
+                  AND t.status = 'ACTIVE' AND ur.branch_id IS NULL AND p.permission_key = ?
+                """, Integer.class, tenantId, userId, permission);
+        return count != null && count > 0;
+    }
+
     public void requireBranchInTenant(UUID tenantId, UUID branchId) {
         Integer count = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM branches WHERE tenant_id = ? AND id = ? AND status = 'ACTIVE'",
