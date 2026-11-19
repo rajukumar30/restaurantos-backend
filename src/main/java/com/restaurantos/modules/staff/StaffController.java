@@ -36,6 +36,8 @@ public class StaffController {
                                                 @RequestParam(required = false) UUID branchId,
                                                 Authentication authentication) {
         access.requirePermission(authentication, tenantId, branchId, "staff:read");
+        boolean tenantWide = branchId == null
+                && access.hasTenantWidePermission(authentication, tenantId, "staff:read");
         String sql = """
                 SELECT DISTINCT u.id, u.name, u.email, u.phone, u.status,
                        string_agg(DISTINCT r.display_name, ', ' ORDER BY r.display_name) AS role_names,
@@ -54,14 +56,14 @@ public class StaffController {
                         AND filter_bu.tenant_user_id = tu.id
                         AND filter_bu.branch_id = ? AND filter_bu.status = 'ACTIVE'
                   ))
-                  AND (ur.branch_id IS NULL OR ? IS NULL OR ur.branch_id = ?)
+                  AND (? = TRUE OR ur.branch_id IS NULL OR ur.branch_id = ?)
                 GROUP BY u.id, u.name, u.email, u.phone, u.status
                 ORDER BY u.name
                 """;
         List<StaffMember> staff = jdbc.query(sql, (rs, row) -> new StaffMember(
                 rs.getObject("id", UUID.class), rs.getString("name"), rs.getString("email"),
                 rs.getString("phone"), rs.getString("status"), rs.getString("role_names"),
-                rs.getString("branch_names")), tenantId, branchId, branchId, branchId, branchId);
+                rs.getString("branch_names")), tenantId, branchId, branchId, tenantWide, branchId);
         return ApiResponse.success("Staff loaded", staff);
     }
 
