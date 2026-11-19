@@ -60,8 +60,8 @@ public class RestaurantOnboardingController {
                 branchUserId, tenantId, branchId, tenantUserId);
         jdbc.update("INSERT INTO roles (id,tenant_id,role_key,display_name,is_system) VALUES (?,?,'OWNER','Restaurant Owner',true)",
                 roleId, tenantId);
-        jdbc.update("INSERT INTO user_roles (tenant_id,tenant_user_id,role_id,branch_id) VALUES (?,?,?,?)",
-                tenantId, tenantUserId, roleId, branchId);
+        jdbc.update("INSERT INTO user_roles (tenant_id,tenant_user_id,role_id,branch_id) VALUES (?,?,?,NULL)",
+                tenantId, tenantUserId, roleId);
 
         return ApiResponse.success("Restaurant and owner account created",
                 new RestaurantCreated(tenantId, branchId, userId, slug, "ACTIVE"));
