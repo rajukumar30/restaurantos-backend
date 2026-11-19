@@ -54,13 +54,14 @@ public class StaffController {
                         AND filter_bu.tenant_user_id = tu.id
                         AND filter_bu.branch_id = ? AND filter_bu.status = 'ACTIVE'
                   ))
+                  AND (ur.branch_id IS NULL OR ? IS NULL OR ur.branch_id = ?)
                 GROUP BY u.id, u.name, u.email, u.phone, u.status
                 ORDER BY u.name
                 """;
         List<StaffMember> staff = jdbc.query(sql, (rs, row) -> new StaffMember(
                 rs.getObject("id", UUID.class), rs.getString("name"), rs.getString("email"),
                 rs.getString("phone"), rs.getString("status"), rs.getString("role_names"),
-                rs.getString("branch_names")), tenantId, branchId, branchId);
+                rs.getString("branch_names")), tenantId, branchId, branchId, branchId, branchId);
         return ApiResponse.success("Staff loaded", staff);
     }
 
