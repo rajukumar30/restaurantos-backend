@@ -2,6 +2,7 @@ package com.restaurantos.config;
 
 import com.restaurantos.modules.auth.JwtAuthenticationFilter;
 import org.springframework.beans.factory.annotation.Qualifier;
+import jakarta.servlet.DispatcherType;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -30,6 +31,7 @@ public class SecurityConfig {
                 .formLogin(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
+                        .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers("/actuator/health", "/actuator/info", "/api/v1/health", "/api/v1/auth/login", "/api/v1/public/qr/**", "/api/v1/public/restaurants/**").permitAll()
                         .requestMatchers("/api/v1/platform/**").hasAuthority("PLATFORM_ADMIN")
                         .anyRequest().authenticated())
