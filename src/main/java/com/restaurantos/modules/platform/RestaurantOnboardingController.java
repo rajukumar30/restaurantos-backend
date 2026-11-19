@@ -75,7 +75,22 @@ public class RestaurantOnboardingController {
                 new RestaurantCreated(tenantId, branchId, userId, slug, subdomain, "/r/" + slug + "/menu", "ACTIVE"));
     }
 
-    private String createAvailableSubdomain(String slug) {\n        String candidate = slug;\n        if (candidate.length() > 63) candidate = candidate.substring(0, 54).replaceAll("-+$", "") + "-" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);\n        if (RESERVED_SUBDOMAINS.contains(candidate)) candidate = "restaurant-" + candidate;\n        Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM tenants WHERE subdomain = ?", Integer.class, candidate);\n        if (count != null && count > 0) candidate = candidate.substring(0, Math.min(candidate.length(), 54)).replaceAll("-+$", "") + "-" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);\n        return candidate;\n    }\n\n    private String slugify(String value) {
+    private String createAvailableSubdomain(String slug) {
+        String candidate = slug;
+        if (candidate.length() > 63) {
+            candidate = candidate.substring(0, 54).replaceAll("-+$", "") + "-"
+                    + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        }
+        if (RESERVED_SUBDOMAINS.contains(candidate)) candidate = "restaurant-" + candidate;
+        Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM tenants WHERE subdomain = ?", Integer.class, candidate);
+        if (count != null && count > 0) {
+            candidate = candidate.substring(0, Math.min(candidate.length(), 54)).replaceAll("-+$", "") + "-"
+                    + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        }
+        return candidate;
+    }
+
+    private String slugify(String value) {
         String slug = value.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-").replaceAll("(^-|-$)", "");
         if (slug.isBlank()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Restaurant name must contain letters or numbers.");
         return slug;
