@@ -76,6 +76,9 @@ public class StaffController {
         if (!List.of("MANAGER", "KITCHEN", "CASHIER", "WAITER", "STAFF").contains(roleKey)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported role. Choose MANAGER, KITCHEN, CASHIER, WAITER or STAFF.");
         }
+        if ("MANAGER".equals(roleKey) && !access.hasTenantWidePermission(authentication, tenantId, "staff:manage")) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only a tenant owner can assign the manager role.");
+        }
         Integer existing = jdbc.queryForObject("SELECT COUNT(*) FROM app_users WHERE lower(email)=lower(?)",
                 Integer.class, request.email());
         if (existing != null && existing > 0) {
@@ -118,7 +121,7 @@ public class StaffController {
                 roleId, tenantId, roleKey, displayName);
 
         List<String> permissions = switch (roleKey) {
-            case "MANAGER" -> List.of("staff:read", "branch:read", "menu:read", "menu:manage", "orders:read",
+            case "MANAGER" -> List.of("staff:read", "staff:manage", "branch:read", "menu:read", "menu:manage", "orders:read",
                     "orders:manage", "kitchen:operate", "payments:read", "reports:read");
             case "KITCHEN" -> List.of("orders:read", "kitchen:operate");
             case "CASHIER" -> List.of("orders:read", "payments:read");
