@@ -40,6 +40,7 @@ public class PublicQrController {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "This table QR code is invalid or inactive.");
         }
         PublicMenu table = matches.get(0);
+        UUID tenantId = jdbc.queryForObject("SELECT tenant_id FROM restaurant_tables WHERE qr_token = ?", UUID.class, qrToken);
         Map<UUID, List<PublicItem>> grouped = new LinkedHashMap<>();
         jdbc.query("""
                 SELECT mc.id AS category_id, mc.name AS category_name,
@@ -58,14 +59,14 @@ public class PublicQrController {
                     rs.getObject("item_id", UUID.class), rs.getString("item_name"),
                     rs.getString("description"), rs.getBigDecimal("price"),
                     rs.getString("dietary_type"), rs.getInt("prep_time_minutes")));
-        }, table.tenantId(), table.branchId());
+        }, tenantId, table.branchId());
         List<PublicCategory> categories = jdbc.query("""
                 SELECT id, name FROM menu_categories
                 WHERE tenant_id = ? AND is_active = TRUE ORDER BY sort_order, name
                 """, (rs, row) -> {
             UUID id = rs.getObject("id", UUID.class);
             return new PublicCategory(id, rs.getString("name"), grouped.getOrDefault(id, List.of()));
-        }, table.tenantId());
+        }, tenantId);
         return ApiResponse.success("Public menu loaded", new PublicMenu(
                 table.tableId(), table.tableName(), table.branchId(), table.branchName(),
                 table.restaurantName(), categories));
