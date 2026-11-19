@@ -100,6 +100,27 @@ public class OrderController {
                 new OrderReceipt(orderId, orderNumber, table.displayName(), total, "NEW"));
     }
 
+    @GetMapping("/api/v1/public/qr/{qrToken}/orders/{orderId}")
+    public ApiResponse<PublicOrderStatus> getPublicOrderStatus(@PathVariable String qrToken,
+                                                                @PathVariable UUID orderId) {
+        List<PublicOrderStatus> orders = jdbc.query("""
+                SELECT o.order_number, o.status, o.total_amount, o.created_at
+                FROM restaurant_orders o
+                JOIN restaurant_tables rt ON rt.id = o.table_id AND rt.tenant_id = o.tenant_id
+                JOIN branches b ON b.id = o.branch_id AND b.tenant_id = o.tenant_id
+                JOIN tenants t ON t.id = o.tenant_id
+                WHERE o.id = ? AND rt.qr_token = ? AND rt.is_active = TRUE
+                  AND b.status = 'ACTIVE' AND t.status = 'ACTIVE'
+                """, (rs, row) -> new PublicOrderStatus(
+                rs.getString("order_number"), rs.getString("status"),
+                rs.getBigDecimal("total_amount"), rs.getTimestamp("created_at").toInstant()),
+                orderId, qrToken);
+        if (orders.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found for this table.");
+        }
+        return ApiResponse.success("Order status loaded", orders.get(0));
+    }
+
     @GetMapping("/api/v1/tenants/{tenantId}/orders")
     public ApiResponse<List<OrderSummary>> listOrders(@PathVariable UUID tenantId,
                                                        @RequestParam UUID branchId,
@@ -158,6 +179,7 @@ public class OrderController {
     public record UpdateOrderStatusRequest(@NotNull UUID branchId, @NotNull @Size(max = 20) String status) {}
     public record OrderReceipt(UUID orderId, String orderNumber, String tableName,
                                BigDecimal totalAmount, String status) {}
+    public record PublicOrderStatus(String orderNumber, String status, BigDecimal totalAmount, java.time.Instant createdAt) {}
     public record OrderSummary(UUID id, String orderNumber, String tableName, String status,
                                BigDecimal totalAmount, int lineCount, int itemCount, String itemsSummary,
                                java.time.Instant createdAt) {}
