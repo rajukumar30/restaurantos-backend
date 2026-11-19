@@ -44,3 +44,5 @@ restaurantos:
     admin-email: ${PLATFORM_ADMIN_EMAIL:}
     admin-password: ${PLATFORM_ADMIN_PASSWORD:}
     admin-name: ${PLATFORM_ADMIN_NAME:Platform Administrator}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
