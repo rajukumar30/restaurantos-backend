@@ -38,6 +38,15 @@ CREATE TABLE app_users (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Platform operators are kept separate from restaurant tenant memberships.
+CREATE TABLE platform_admins (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL UNIQUE REFERENCES app_users(id),
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE'
+        CHECK (status IN ('ACTIVE', 'LOCKED', 'INACTIVE')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE tenant_users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES tenants(id),
@@ -95,6 +104,12 @@ CREATE TABLE role_permissions (
     PRIMARY KEY (role_id, permission_id)
 );
 
+CREATE TABLE platform_admin_roles (
+    platform_admin_id UUID NOT NULL REFERENCES platform_admins(id),
+    role_id UUID NOT NULL REFERENCES roles(id),
+    PRIMARY KEY (platform_admin_id, role_id)
+);
+
 CREATE TABLE user_roles (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL,
@@ -108,9 +123,9 @@ CREATE TABLE user_roles (
     CONSTRAINT fk_user_roles_role
         FOREIGN KEY (tenant_id, role_id)
         REFERENCES roles(tenant_id, id),
-    CONSTRAINT fk_user_roles_branch
-        FOREIGN KEY (tenant_id, branch_id)
-        REFERENCES branches(tenant_id, id)
+    CONSTRAINT fk_user_roles_branch_membership
+        FOREIGN KEY (tenant_id, branch_id, tenant_user_id)
+        REFERENCES branch_users(tenant_id, branch_id, tenant_user_id)
 );
 
 CREATE INDEX idx_branches_tenant_status ON branches(tenant_id, status);
