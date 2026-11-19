@@ -13,17 +13,23 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Value;
 
 @RestController
 @RequestMapping("/api/v1/platform/restaurants")
 public class RestaurantOnboardingController {
     private final JdbcTemplate jdbc;
     private final PasswordEncoder encoder;
+    private final String baseDomain;
+    private static final Set<String> RESERVED_SUBDOMAINS = Set.of("www", "admin", "api", "app", "support", "login", "mail", "status", "docs");
 
-    public RestaurantOnboardingController(JdbcTemplate jdbc, PasswordEncoder encoder) {
+    public RestaurantOnboardingController(JdbcTemplate jdbc, PasswordEncoder encoder,
+            @Value("${restaurantos.domains.base-domain:restaurantos.com}") String baseDomain) {
         this.jdbc = jdbc;
         this.encoder = encoder;
+        this.baseDomain = baseDomain.toLowerCase(Locale.ROOT).trim();
     }
 
     @PostMapping
@@ -34,6 +40,7 @@ public class RestaurantOnboardingController {
         if (slugCount != null && slugCount > 0) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "A restaurant with this name already exists; choose a unique name.");
         }
+        String subdomain = createAvailableSubdomain(slug);
         Integer emailCount = jdbc.queryForObject("SELECT COUNT(*) FROM app_users WHERE lower(email)=lower(?)", Integer.class, request.ownerEmail());
         if (emailCount != null && emailCount > 0) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "An account with this owner email already exists.");
@@ -46,7 +53,7 @@ public class RestaurantOnboardingController {
         UUID branchUserId = UUID.randomUUID();
         UUID roleId = UUID.randomUUID();
 
-        jdbc.update("INSERT INTO tenants (id,name,slug) VALUES (?,?,?)", tenantId, request.restaurantName().trim(), slug);
+        jdbc.update("INSERT INTO tenants (id,name,slug,subdomain) VALUES (?,?,?,?)", tenantId, request.restaurantName().trim(), slug, subdomain);
         jdbc.update("INSERT INTO branches (id,tenant_id,name,branch_code,address,phone) VALUES (?,?,?,'MAIN',CAST(? AS jsonb),?)",
                 branchId, tenantId, request.branchName().trim(),
                 request.addressJson() == null || request.addressJson().isBlank() ? "{}" : request.addressJson(),
@@ -69,10 +76,10 @@ public class RestaurantOnboardingController {
                 tenantId, tenantUserId, roleId);
 
         return ApiResponse.success("Restaurant and owner account created",
-                new RestaurantCreated(tenantId, branchId, userId, slug, "ACTIVE"));
+                new RestaurantCreated(tenantId, branchId, userId, slug, subdomain, "https://" + subdomain + "." + baseDomain, "ACTIVE"));
     }
 
-    private String slugify(String value) {
+    private String createAvailableSubdomain(String slug) {\n        String candidate = slug;\n        if (candidate.length() > 63) candidate = candidate.substring(0, 54).replaceAll("-+$", "") + "-" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);\n        if (RESERVED_SUBDOMAINS.contains(candidate)) candidate = "restaurant-" + candidate;\n        Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM tenants WHERE subdomain = ?", Integer.class, candidate);\n        if (count != null && count > 0) candidate = candidate.substring(0, Math.min(candidate.length(), 54)).replaceAll("-+$", "") + "-" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);\n        return candidate;\n    }\n\n    private String slugify(String value) {
         String slug = value.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-").replaceAll("(^-|-$)", "");
         if (slug.isBlank()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Restaurant name must contain letters or numbers.");
         return slug;
@@ -87,5 +94,5 @@ public class RestaurantOnboardingController {
             @Size(max=20) String ownerPhone,
             @Size(max=20) String branchPhone,
             String addressJson) {}
-    public record RestaurantCreated(UUID tenantId, UUID branchId, UUID ownerUserId, String slug, String status) {}
+    public record RestaurantCreated(UUID tenantId, UUID branchId, UUID ownerUserId, String slug, String subdomain, String restaurantUrl, String status) {}
 }
