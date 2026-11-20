@@ -195,7 +195,8 @@ public class OrderController {
     }
 
     public record PlaceOrderRequest(@NotEmpty List<@Valid OrderLineRequest> items,
-                                    @Size(max = 120) String customerName,
+                                    @NotBlank @Size(min = 2, max = 120) String customerName,
+                                    @NotBlank @Pattern(regexp = "\\+91[6-9][0-9]{9}") String customerPhone,
                                     @Size(max = 500) String notes) {}
     public record OrderLineRequest(@NotNull UUID menuItemId, @Min(1) @Max(20) int quantity) {}
     public record UpdateOrderStatusRequest(@NotNull UUID branchId, @NotNull @Size(max = 20) String status) {}
