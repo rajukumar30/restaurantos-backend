@@ -51,8 +51,8 @@ public class ServiceRequestController {
         List<ServiceRequest> active=jdbc.query("""
             SELECT sr.id,sr.request_type,sr.status,sr.notes,sr.created_at,rt.display_name
             FROM service_requests sr JOIN restaurant_tables rt ON rt.id=sr.table_id
-            WHERE sr.table_id=? AND sr.request_type=? AND sr.status IN ('REQUESTED','ON_THE_WAY')
-            ORDER BY sr.created_at DESC LIMIT 1
+            WHERE sr.table_id=? AND sr.request_type=? AND (sr.status IN ('REQUESTED','ON_THE_WAY') OR (sr.status='COMPLETED' AND sr.completed_at>NOW()-INTERVAL '30 minutes'))
+            ORDER BY sr.created_at DESC LIMIT 30 LIMIT 1
             """,ServiceRequestController::map,table.id(),body.type());
         if(!active.isEmpty())return ApiResponse.success("Request already active",active.getFirst());
         UUID id=UUID.randomUUID();
