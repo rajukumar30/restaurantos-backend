@@ -2,6 +2,7 @@ package com.restaurantos.modules.service;
 
 import com.restaurantos.common.api.ApiResponse;
 import com.restaurantos.modules.staff.TenantAccessService;
+import com.restaurantos.modules.platform.TenantFeatureAccess;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -20,8 +21,9 @@ import java.util.UUID;
 public class ServiceRequestController {
     private final JdbcTemplate jdbc;
     private final TenantAccessService access;
-    public ServiceRequestController(JdbcTemplate jdbc,TenantAccessService access) {
-        this.jdbc=jdbc;this.access=access;
+    private final TenantFeatureAccess features;
+    public ServiceRequestController(JdbcTemplate jdbc,TenantAccessService access,TenantFeatureAccess features) {
+        this.jdbc=jdbc;this.access=access;this.features=features;
     }
 
     private TableInfo table(String qrToken) {
@@ -42,6 +44,7 @@ public class ServiceRequestController {
     @Transactional
     public ApiResponse<ServiceRequest> create(@PathVariable String qrToken,@Valid @RequestBody CreateRequest body) {
         TableInfo table=table(qrToken);
+        features.require(table.tenantId(),"SERVICE_REQUESTS");
         if(!List.of("WAITER","CLEANING","WATER","CUTLERY","BILL","OTHER").contains(body.type()))
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Unsupported service request");
         if("OTHER".equals(body.type()) && (body.notes()==null||body.notes().isBlank()))
@@ -95,6 +98,7 @@ public class ServiceRequestController {
             Authentication authentication) {
         access.requirePermission(authentication,tenantId,branchId,"orders:read");
         access.requireBranchInTenant(tenantId,branchId);
+        features.require(tenantId,"SERVICE_REQUESTS");
         return ApiResponse.success("Service requests",jdbc.query("""
             SELECT sr.id,sr.request_type,sr.status,sr.notes,sr.created_at,rt.display_name
             FROM service_requests sr JOIN restaurant_tables rt ON rt.id=sr.table_id
