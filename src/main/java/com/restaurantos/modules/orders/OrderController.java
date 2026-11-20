@@ -165,6 +165,13 @@ public class OrderController {
                 WHERE tenant_id = ? AND branch_id = ? AND id = ? AND status = ?
                 """, status, tenantId, request.branchId(), orderId, status.equals("SERVED") ? "READY" : "NEW");
         if (updated == 0) throw new ResponseStatusException(HttpStatus.CONFLICT, "Order status changed or this transition is not allowed.");
+        if ("SERVED".equals(status)) {
+            UUID actorId=(UUID) authentication.getPrincipal();
+            jdbc.update("""
+                INSERT INTO restaurant_order_service_events(tenant_id,branch_id,order_id,actor_id,event_type)
+                VALUES (?,?,?,?,?)
+                """,tenantId,request.branchId(),orderId,actorId,"WAITER_CONFIRMED_SERVED");
+        }
         return ApiResponse.success("Order status updated", new OrderStatusUpdated(orderId, status));
     }
 
