@@ -78,6 +78,7 @@ public class ServiceRequestController {
     @GetMapping("/api/v1/public/qr/{qrToken}/service-requests")
     public ApiResponse<List<ServiceRequest>> guestList(@PathVariable String qrToken) {
         TableInfo table=table(qrToken);
+        features.require(table.tenantId(),"SERVICE_REQUESTS");
         // QR-based access: intentionally scoped to active requests for the scanned table.
         return ApiResponse.success("Active service requests",jdbc.query("""
             SELECT sr.id,sr.request_type,sr.status,sr.notes,sr.created_at,rt.display_name
@@ -92,6 +93,7 @@ public class ServiceRequestController {
     @Transactional
     public ApiResponse<ServiceRequest> cancel(@PathVariable String qrToken,@PathVariable UUID requestId) {
         TableInfo table=table(qrToken);
+        features.require(table.tenantId(),"SERVICE_REQUESTS");
         int changed=jdbc.update("""
             UPDATE service_requests SET status='CANCELLED',cancelled_at=NOW()
             WHERE id=? AND table_id=? AND tenant_id=? AND branch_id=? AND status='REQUESTED'
@@ -120,6 +122,7 @@ public class ServiceRequestController {
             @RequestParam UUID branchId,@Valid @RequestBody UpdateRequest body,Authentication authentication) {
         UUID staff=access.requirePermission(authentication,tenantId,branchId,"orders:manage");
         access.requireBranchInTenant(tenantId,branchId);
+        features.require(tenantId,"SERVICE_REQUESTS");
         int changed;
         if("ON_THE_WAY".equals(body.status())) {
             changed=jdbc.update("""
