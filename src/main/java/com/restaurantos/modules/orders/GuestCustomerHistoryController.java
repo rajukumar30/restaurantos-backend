@@ -113,13 +113,13 @@ public class GuestCustomerHistoryController {
             """, (rs, i) -> rs.getString(1), sha256(token), tenantId);
         if (phones.isEmpty()) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Session expired");
         List<CustomerOrder> result = jdbc.query("""
-            SELECT o.id,o.order_number,o.status,o.total_amount,o.created_at,rt.display_name
+            SELECT o.id,o.order_number,o.status,o.total_amount,o.created_at,rt.display_name,o.customer_name
             FROM restaurant_orders o
             JOIN restaurant_tables rt ON rt.id=o.table_id AND rt.tenant_id=o.tenant_id
             WHERE o.tenant_id=? AND o.customer_phone=?
             ORDER BY o.created_at DESC LIMIT 100
             """, (rs, i) -> new CustomerOrder(rs.getObject(1,UUID.class), rs.getString(2),
-                rs.getString(3),rs.getBigDecimal(4),rs.getTimestamp(5).toInstant(),rs.getString(6)),
+                rs.getString(3),rs.getBigDecimal(4),rs.getTimestamp(5).toInstant(),rs.getString(6),rs.getString(7)),
                 tenantId, phones.getFirst());
         return ApiResponse.success("Verified customer history", result);
     }
@@ -138,5 +138,5 @@ public class GuestCustomerHistoryController {
     public record OtpRequested(UUID challengeId, int expiresInSeconds, String demoCode) {}
     public record VerifiedSession(String accessToken, String phone, Instant expiresAt) {}
     public record CustomerOrder(UUID orderId, String orderNumber, String status,
-            java.math.BigDecimal totalAmount, Instant createdAt, String tableName) {}
+            java.math.BigDecimal totalAmount, Instant createdAt, String tableName, String customerName) {}
 }
