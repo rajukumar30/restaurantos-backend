@@ -32,7 +32,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
-                        .requestMatchers("/actuator/health", "/actuator/info", "/api/v1/health", "/api/v1/auth/login", "/api/v1/public/qr/**", "/api/v1/public/restaurants/**").permitAll()
+                        .requestMatchers("/actuator/health", "/actuator/info", "/api/v1/health", "/api/v1/auth/login", "/api/v1/public/qr/**", "/api/v1/public/receipts/**", "/api/v1/public/restaurants/**").permitAll()
                         .requestMatchers("/api/v1/platform/**").hasAuthority("PLATFORM_ADMIN")
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class).build();
