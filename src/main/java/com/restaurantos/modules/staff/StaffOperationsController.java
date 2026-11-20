@@ -57,6 +57,34 @@ public class StaffOperationsController {
   return ApiResponse.success("Staff access loaded",Map.of("roles",roles,"permissions",permissions,"branchId",branchId));
  }
 
+ @GetMapping("/service-mode")
+ public ApiResponse<Map<String,Object>> serviceMode(@PathVariable UUID tenantId,@RequestParam UUID branchId,Authentication auth){
+  access.requirePermission(auth,tenantId,branchId,"orders:read");
+  access.requireBranchInTenant(tenantId,branchId);
+  String mode=jdbc.queryForObject("SELECT COALESCE((SELECT service_mode FROM restaurant_branch_service_settings WHERE tenant_id=? AND branch_id=?),'WAITER_CONFIRMED')",String.class,tenantId,branchId);
+  return ApiResponse.success("Service mode loaded",Map.of("mode",mode));
+ }
+
+ @PatchMapping("/kitchen/orders/{orderId}/served")
+ @Transactional
+ public ApiResponse<Map<String,Object>> kitchenServed(@PathVariable UUID tenantId,@PathVariable UUID orderId,
+   @Valid @RequestBody KitchenStatusRequest request,Authentication auth){
+  UUID userId=access.requirePermission(auth,tenantId,request.branchId(),"kitchen:operate");
+  access.requireBranchInTenant(tenantId,request.branchId());
+  String mode=jdbc.queryForObject("SELECT COALESCE((SELECT service_mode FROM restaurant_branch_service_settings WHERE tenant_id=? AND branch_id=?),'WAITER_CONFIRMED')",String.class,tenantId,request.branchId());
+  if(!"KITCHEN_MANAGED".equals(mode))throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Kitchen handoff is not enabled for this branch");
+  int updated=jdbc.update("""
+   UPDATE restaurant_orders SET status='SERVED',updated_at=NOW()
+   WHERE tenant_id=? AND branch_id=? AND id=? AND status='READY'
+   """,tenantId,request.branchId(),orderId);
+  if(updated==0)throw new ResponseStatusException(HttpStatus.CONFLICT,"Order must be READY before kitchen handoff");
+  jdbc.update("""
+   INSERT INTO restaurant_order_service_events(tenant_id,branch_id,order_id,actor_id,event_type)
+   VALUES (?,?,?,?,'KITCHEN_HANDOFF_SERVED')
+   """,tenantId,request.branchId(),orderId,userId);
+  return ApiResponse.success("Order handed off and marked served",Map.of("orderId",orderId,"status","SERVED"));
+ }
+
  public record KitchenStatusRequest(@NotNull UUID branchId,@NotNull String status){}
  @PatchMapping("/kitchen/orders/{orderId}/status")
  @Transactional
