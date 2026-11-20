@@ -1,6 +1,7 @@
 package com.restaurantos.modules.orders;
 
 import com.restaurantos.common.api.ApiResponse;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.restaurantos.modules.auth.JwtService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -28,6 +29,7 @@ public class CustomerAuthController {
     private final JwtService jwt;
     private final String accountSid, authToken, verifyServiceSid;
     private final HttpClient client=HttpClient.newHttpClient();
+    private final ObjectMapper json=new ObjectMapper();
 
     public CustomerAuthController(JdbcTemplate jdbc, JwtService jwt,
         @Value("${restaurantos.sms.twilio-account-sid:}") String accountSid,
@@ -69,7 +71,10 @@ public class CustomerAuthController {
     public ApiResponse<CustomerSession> verify(@Valid @RequestBody VerifyRequest request){
         String result=callVerify("/VerificationCheck","To="+form(request.phone())+"&Code="+form(request.code()));
         // Only the explicit Twilio approved status grants a customer session.
-        if(!result.matches("(?s).*\\\"status\\\"\\s*:\\s*\\\"approved\\\".*"))
+        boolean approved;
+        try { approved="approved".equals(json.readTree(result).path("status").asText()); }
+        catch(Exception ex) { throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,"Invalid verification response."); }
+        if(!approved)
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"Incorrect or expired verification code.");
         List<CustomerSession> existing=jdbc.query("SELECT id,full_name,phone_e164 FROM restaurant_customers WHERE phone_e164=?",
             (rs,n)->new CustomerSession("",rs.getObject("id",UUID.class),rs.getString("full_name"),rs.getString("phone_e164")),request.phone());
