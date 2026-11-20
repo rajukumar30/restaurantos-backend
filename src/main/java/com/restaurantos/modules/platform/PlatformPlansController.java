@@ -98,4 +98,17 @@ public class PlatformPlansController {
    FROM platform_subscription_plans WHERE id=?
    """,(rs,i)->map(rs),id);
  }
+
+ @PostMapping("/{id}/activate")
+ @Transactional
+ public ApiResponse<Plan> activate(@PathVariable UUID id,Authentication authentication){
+  if(authentication==null||!(authentication.getPrincipal() instanceof UUID))
+   throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"Authentication required");
+  int changed=jdbc.update("""
+   UPDATE platform_subscription_plans SET status='ACTIVE',updated_at=NOW()
+   WHERE id=? AND status='DRAFT'
+   """,id);
+  if(changed==0)throw new ResponseStatusException(HttpStatus.CONFLICT,"Only draft plans can be activated");
+  return ApiResponse.success("Plan activated",find(id));
+ }
 }
