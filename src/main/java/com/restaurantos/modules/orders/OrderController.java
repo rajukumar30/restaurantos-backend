@@ -84,14 +84,41 @@ public class OrderController {
             total = total.add(line.unitPrice().multiply(BigDecimal.valueOf(line.quantity())));
         }
 
+        // Serialize orders for the same table so only one active visit is created.
+        jdbc.queryForObject("SELECT id FROM restaurant_tables WHERE id=? FOR UPDATE",
+                UUID.class, table.tableId());
+        List<UUID> activeVisits = jdbc.query("""
+                SELECT id FROM table_visits
+                WHERE tenant_id=? AND branch_id=? AND table_id=?
+                  AND status IN ('OPEN','PAYMENT_PENDING','PAID')
+                FOR UPDATE
+                """, (rs, row) -> rs.getObject(1, UUID.class),
+                table.tenantId(), table.branchId(), table.tableId());
+        UUID visitId;
+        if (activeVisits.isEmpty()) {
+            visitId = UUID.randomUUID();
+            String billNumber = "B" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase();
+            jdbc.update("""
+                    INSERT INTO table_visits(id,tenant_id,branch_id,table_id,bill_number,status)
+                    VALUES (?,?,?,?,?,'OPEN')
+                    """, visitId, table.tenantId(), table.branchId(), table.tableId(), billNumber);
+        } else {
+            visitId = activeVisits.get(0);
+            String visitStatus = jdbc.queryForObject(
+                    "SELECT status FROM table_visits WHERE id=?", String.class, visitId);
+            if (!"OPEN".equals(visitStatus))
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "This table bill is being settled. Please contact the cashier.");
+        }
+
         UUID orderId = UUID.randomUUID();
         String orderNumber = "R" + UUID.randomUUID().toString().replace("-", "").substring(0, 9).toUpperCase();
         jdbc.update("""
                 INSERT INTO restaurant_orders
-                    (id, tenant_id, branch_id, table_id, order_number, customer_name, notes, total_amount, customer_phone)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (id, tenant_id, branch_id, table_id, order_number, customer_name, notes, total_amount, customer_phone, table_visit_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, orderId, table.tenantId(), table.branchId(), table.tableId(), orderNumber,
-                guestName, blankToNull(request.notes()), total, guestPhone);
+                guestName, blankToNull(request.notes()), total, guestPhone, visitId);
         for (ValidatedOrderLine line : lines) {
             jdbc.update("""
                     INSERT INTO restaurant_order_items
