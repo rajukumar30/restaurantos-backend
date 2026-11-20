@@ -40,6 +40,13 @@ public class ServiceRequestController {
         return tables.getFirst();
     }
 
+    @GetMapping("/api/v1/public/qr/{qrToken}/service-requests/availability")
+    public ApiResponse<Boolean> availability(@PathVariable String qrToken) {
+        TableInfo table=table(qrToken);
+        return ApiResponse.success("Service request availability",
+            features.enabled(table.tenantId(),"SERVICE_REQUESTS"));
+    }
+
     @PostMapping("/api/v1/public/qr/{qrToken}/service-requests")
     @Transactional
     public ApiResponse<ServiceRequest> create(@PathVariable String qrToken,@Valid @RequestBody CreateRequest body) {
