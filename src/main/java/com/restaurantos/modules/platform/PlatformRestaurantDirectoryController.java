@@ -58,6 +58,34 @@ public class PlatformRestaurantDirectoryController {
             }, id);
     }
 
+    public record BranchDetail(UUID id, String name, String branchCode, String phone,
+                               String status, String timezone, String address) {}
+    public record OwnerDetail(UUID id, String name, String email, String phone, String status) {}
+    public record RestaurantProfile(Restaurant restaurant, List<BranchDetail> branches,
+                                    List<OwnerDetail> owners) {}
+
+    @GetMapping("/{tenantId}/profile")
+    public ApiResponse<RestaurantProfile> profile(@PathVariable UUID tenantId) {
+        Restaurant restaurant=find(tenantId);
+        List<BranchDetail> branches=jdbc.query("""
+            SELECT id,name,branch_code,phone,status,timezone,address::text AS address_text
+            FROM branches WHERE tenant_id=? ORDER BY created_at,id
+            """,(rs,i)->new BranchDetail(rs.getObject("id",UUID.class),rs.getString("name"),
+                rs.getString("branch_code"),rs.getString("phone"),rs.getString("status"),
+                rs.getString("timezone"),rs.getString("address_text")),tenantId);
+        List<OwnerDetail> owners=jdbc.query("""
+            SELECT DISTINCT u.id,u.name,u.email,u.phone,u.status
+            FROM app_users u
+            JOIN tenant_users tu ON tu.user_id=u.id AND tu.tenant_id=?
+            JOIN user_roles ur ON ur.tenant_user_id=tu.id AND ur.tenant_id=tu.tenant_id
+            JOIN roles r ON r.id=ur.role_id
+            WHERE UPPER(r.role_key) IN ('OWNER','RESTAURANT_OWNER')
+            ORDER BY u.name,u.id
+            """,(rs,i)->new OwnerDetail(rs.getObject("id",UUID.class),rs.getString("name"),
+                rs.getString("email"),rs.getString("phone"),rs.getString("status")),tenantId);
+        return ApiResponse.success("Restaurant profile",new RestaurantProfile(restaurant,branches,owners));
+    }
+
     public record UpdateRestaurant(String name, String status) {}
 
     @PatchMapping("/{tenantId}")
