@@ -98,7 +98,7 @@ public class PlatformFeatureController {
                    o.enabled AS override_enabled
             FROM feature_catalog f
             LEFT JOIN tenant_feature_overrides o
-              ON o.feature_key=f.feature_key AND o.tenant_id=?
+              ON o.feature_key=f.feature_key AND o.tenant_id=CAST(? AS UUID)
             ORDER BY f.category, f.display_name
             """, (rs, row) -> {
             String key = rs.getString("feature_key");
