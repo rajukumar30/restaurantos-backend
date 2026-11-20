@@ -156,15 +156,15 @@ public class OrderController {
                                                          Authentication authentication) {
         access.requirePermission(authentication, tenantId, request.branchId(), "orders:manage");
         access.requireBranchInTenant(tenantId, request.branchId());
-        String status = request.status().trim().toUpperCase();
-        if (!List.of("ACCEPTED", "PREPARING", "READY", "SERVED", "CANCELLED").contains(status)) {
+        String status = request.status().trim().toUpperCase(java.util.Locale.ROOT);
+        if (!List.of("SERVED", "CANCELLED").contains(status)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported order status.");
         }
         int updated = jdbc.update("""
                 UPDATE restaurant_orders SET status = ?, updated_at = NOW()
-                WHERE tenant_id = ? AND branch_id = ? AND id = ? AND status <> 'CANCELLED'
-                """, status, tenantId, request.branchId(), orderId);
-        if (updated == 0) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found or already cancelled.");
+                WHERE tenant_id = ? AND branch_id = ? AND id = ? AND status = ?
+                """, status, tenantId, request.branchId(), orderId, status.equals("SERVED") ? "READY" : "NEW");
+        if (updated == 0) throw new ResponseStatusException(HttpStatus.CONFLICT, "Order status changed or this transition is not allowed.");
         return ApiResponse.success("Order status updated", new OrderStatusUpdated(orderId, status));
     }
 
