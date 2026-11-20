@@ -73,18 +73,16 @@ public class GuestCustomerHistoryController {
     }
 
     @PostMapping("/otp/verify")
-    @Transactional
     public ApiResponse<VerifiedSession> verify(@PathVariable String qrToken,
             @Valid @RequestBody VerifyRequest body) {
         requireDemo();
         UUID tenantId = tenant(qrToken);
         List<String> phones = jdbc.query("""
-            SELECT phone FROM guest_otp_challenges
+            UPDATE guest_otp_challenges SET attempts=attempts+1
             WHERE id=? AND tenant_id=? AND consumed_at IS NULL AND expires_at>NOW() AND attempts<5
-            FOR UPDATE
+            RETURNING phone
             """, (rs, i) -> rs.getString(1), body.challengeId(), tenantId);
         if (phones.isEmpty()) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Challenge expired or invalid");
-        jdbc.update("UPDATE guest_otp_challenges SET attempts=attempts+1 WHERE id=?", body.challengeId());
         if (!MessageDigest.isEqual(DEMO_CODE.getBytes(StandardCharsets.UTF_8),
                 body.code().getBytes(StandardCharsets.UTF_8)))
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Incorrect verification code");
