@@ -2,6 +2,7 @@ package com.restaurantos.modules.service;
 
 import com.restaurantos.common.api.ApiResponse;
 import com.restaurantos.modules.staff.TenantAccessService;
+import com.restaurantos.modules.platform.TenantFeatureAccess;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -20,8 +21,9 @@ import java.util.UUID;
 public class ServiceRequestController {
     private final JdbcTemplate jdbc;
     private final TenantAccessService access;
-    public ServiceRequestController(JdbcTemplate jdbc,TenantAccessService access) {
-        this.jdbc=jdbc;this.access=access;
+    private final TenantFeatureAccess features;
+    public ServiceRequestController(JdbcTemplate jdbc,TenantAccessService access,TenantFeatureAccess features) {
+        this.jdbc=jdbc;this.access=access;this.features=features;
     }
 
     private TableInfo table(String qrToken) {
@@ -38,10 +40,18 @@ public class ServiceRequestController {
         return tables.getFirst();
     }
 
+    @GetMapping("/api/v1/public/qr/{qrToken}/service-requests/availability")
+    public ApiResponse<Boolean> availability(@PathVariable String qrToken) {
+        TableInfo table=table(qrToken);
+        return ApiResponse.success("Service request availability",
+            features.enabled(table.tenantId(),"SERVICE_REQUESTS"));
+    }
+
     @PostMapping("/api/v1/public/qr/{qrToken}/service-requests")
     @Transactional
     public ApiResponse<ServiceRequest> create(@PathVariable String qrToken,@Valid @RequestBody CreateRequest body) {
         TableInfo table=table(qrToken);
+        features.require(table.tenantId(),"SERVICE_REQUESTS");
         if(!List.of("WAITER","CLEANING","WATER","CUTLERY","BILL","OTHER").contains(body.type()))
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Unsupported service request");
         if("OTHER".equals(body.type()) && (body.notes()==null||body.notes().isBlank()))
@@ -68,6 +78,7 @@ public class ServiceRequestController {
     @GetMapping("/api/v1/public/qr/{qrToken}/service-requests")
     public ApiResponse<List<ServiceRequest>> guestList(@PathVariable String qrToken) {
         TableInfo table=table(qrToken);
+        features.require(table.tenantId(),"SERVICE_REQUESTS");
         // QR-based access: intentionally scoped to active requests for the scanned table.
         return ApiResponse.success("Active service requests",jdbc.query("""
             SELECT sr.id,sr.request_type,sr.status,sr.notes,sr.created_at,rt.display_name
@@ -82,6 +93,7 @@ public class ServiceRequestController {
     @Transactional
     public ApiResponse<ServiceRequest> cancel(@PathVariable String qrToken,@PathVariable UUID requestId) {
         TableInfo table=table(qrToken);
+        features.require(table.tenantId(),"SERVICE_REQUESTS");
         int changed=jdbc.update("""
             UPDATE service_requests SET status='CANCELLED',cancelled_at=NOW()
             WHERE id=? AND table_id=? AND tenant_id=? AND branch_id=? AND status='REQUESTED'
@@ -95,6 +107,7 @@ public class ServiceRequestController {
             Authentication authentication) {
         access.requirePermission(authentication,tenantId,branchId,"orders:read");
         access.requireBranchInTenant(tenantId,branchId);
+        features.require(tenantId,"SERVICE_REQUESTS");
         return ApiResponse.success("Service requests",jdbc.query("""
             SELECT sr.id,sr.request_type,sr.status,sr.notes,sr.created_at,rt.display_name
             FROM service_requests sr JOIN restaurant_tables rt ON rt.id=sr.table_id
@@ -109,6 +122,7 @@ public class ServiceRequestController {
             @RequestParam UUID branchId,@Valid @RequestBody UpdateRequest body,Authentication authentication) {
         UUID staff=access.requirePermission(authentication,tenantId,branchId,"orders:manage");
         access.requireBranchInTenant(tenantId,branchId);
+        features.require(tenantId,"SERVICE_REQUESTS");
         int changed;
         if("ON_THE_WAY".equals(body.status())) {
             changed=jdbc.update("""
