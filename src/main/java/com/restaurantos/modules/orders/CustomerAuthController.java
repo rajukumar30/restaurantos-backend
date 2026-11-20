@@ -11,7 +11,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -89,13 +88,12 @@ public class CustomerAuthController {
         return ApiResponse.success("Verification code requested","SENT");
     }
     @PostMapping("/verify")
-    @Transactional
     public ApiResponse<CustomerSession> verify(@Valid @RequestBody VerifyRequest request){
         boolean approved;
         if(demoEnabled){
             List<Boolean> checks=jdbc.query("""
                 SELECT expires_at > NOW() AND attempts < 5 AS valid
-                FROM restaurant_customer_demo_otp_challenges WHERE phone_e164=? FOR UPDATE
+                FROM restaurant_customer_demo_otp_challenges WHERE phone_e164=?
                 """,(rs,n)->rs.getBoolean("valid"),request.phone());
             if(checks.isEmpty()||!checks.get(0)) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"Demo code expired or attempts exceeded. Request a new code.");
             jdbc.update("UPDATE restaurant_customer_demo_otp_challenges SET attempts=attempts+1 WHERE phone_e164=?",request.phone());
