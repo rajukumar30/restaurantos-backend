@@ -109,4 +109,45 @@ public class PlatformRestaurantDirectoryController {
             """,actorId,tenantId);
         return ApiResponse.success("Restaurant updated",find(tenantId));
     }
+
+    public record UpdateBranch(String name, String phone, String status) {}
+
+    @PatchMapping("/{tenantId}/branches/{branchId}")
+    @Transactional
+    public ApiResponse<BranchDetail> updateBranch(@PathVariable UUID tenantId,
+                                                   @PathVariable UUID branchId,
+                                                   @RequestBody UpdateBranch request,
+                                                   Authentication authentication) {
+        if (authentication == null || !(authentication.getPrincipal() instanceof UUID actorId))
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
+        find(tenantId);
+        BranchDetail before = jdbc.query("""
+            SELECT id,name,branch_code,phone,status,timezone,address::text AS address_text
+            FROM branches WHERE tenant_id=? AND id=? FOR UPDATE
+            """, rs -> {
+                if (!rs.next()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Branch not found");
+                return new BranchDetail(rs.getObject("id",UUID.class),rs.getString("name"),
+                    rs.getString("branch_code"),rs.getString("phone"),rs.getString("status"),
+                    rs.getString("timezone"),rs.getString("address_text"));
+            }, tenantId,branchId);
+        String name = request.name() == null ? before.name() : request.name().strip();
+        String phone = request.phone() == null ? before.phone() : request.phone().strip();
+        String status = request.status() == null ? before.status() : request.status();
+        if (name.isBlank() || name.length() > 150)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Branch name must be 1–150 characters");
+        if (phone != null && phone.length() > 30)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Phone must be at most 30 characters");
+        if (!"ACTIVE".equals(status) && !"INACTIVE".equals(status))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid branch status");
+        jdbc.update("""
+            UPDATE branches SET name=?,phone=?,status=?,updated_at=NOW()
+            WHERE tenant_id=? AND id=?
+            """,name,phone,status,tenantId,branchId);
+        jdbc.update("""
+            INSERT INTO platform_admin_audit_logs(actor_user_id,tenant_id,action)
+            VALUES(?,?,'BRANCH_PROFILE_UPDATED')
+            """,actorId,tenantId);
+        return ApiResponse.success("Branch updated",
+            new BranchDetail(before.id(),name,before.branchCode(),phone,status,before.timezone(),before.address()));
+    }
 }
