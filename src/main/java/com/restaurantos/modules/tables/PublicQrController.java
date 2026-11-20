@@ -26,16 +26,17 @@ public class PublicQrController {
         List<PublicMenu> matches = jdbc.query("""
                 SELECT rt.id AS table_id, rt.display_name AS table_name,
                        b.id AS branch_id, b.name AS branch_name, t.name AS restaurant_name,
-                       rt.tenant_id
+                       rt.tenant_id, COALESCE(gb.slogan, '') AS slogan, COALESCE(gb.logo_url, '') AS logo_url, COALESCE(gb.banner_url, '') AS banner_url, COALESCE(gb.theme, 'CLASSIC') AS theme
                 FROM restaurant_tables rt
                 JOIN branches b ON b.id = rt.branch_id AND b.tenant_id = rt.tenant_id
                 JOIN tenants t ON t.id = rt.tenant_id
+                LEFT JOIN restaurant_guest_branding gb ON gb.tenant_id = rt.tenant_id
                 WHERE rt.qr_token = ? AND rt.is_active = TRUE
                   AND b.status = 'ACTIVE' AND t.status = 'ACTIVE'
                 """, (rs, row) -> new PublicMenu(
                 rs.getObject("table_id", UUID.class), rs.getString("table_name"),
                 rs.getObject("branch_id", UUID.class), rs.getString("branch_name"),
-                rs.getString("restaurant_name"), List.of()), qrToken);
+                rs.getString("restaurant_name"), List.of(), rs.getString("slogan"), rs.getString("logo_url"), rs.getString("banner_url"), rs.getString("theme")), qrToken);
         if (matches.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "This table QR code is invalid or inactive.");
         }
@@ -69,11 +70,11 @@ public class PublicQrController {
         }, tenantId);
         return ApiResponse.success("Public menu loaded", new PublicMenu(
                 table.tableId(), table.tableName(), table.branchId(), table.branchName(),
-                table.restaurantName(), categories));
+                table.restaurantName(), categories, table.slogan(), table.logoUrl(), table.bannerUrl(), table.theme()));
     }
 
     public record PublicMenu(UUID tableId, String tableName, UUID branchId, String branchName,
-                             String restaurantName, List<PublicCategory> categories) {}
+                             String restaurantName, List<PublicCategory> categories, String slogan, String logoUrl, String bannerUrl, String theme) {}
     public record PublicCategory(UUID id, String name, List<PublicItem> items) {}
     public record PublicItem(UUID id, String name, String description, java.math.BigDecimal price,
                              String dietaryType, int prepTimeMinutes) {}
