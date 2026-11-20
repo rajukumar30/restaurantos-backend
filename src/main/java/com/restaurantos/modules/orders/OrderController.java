@@ -35,7 +35,9 @@ public class OrderController {
     @PostMapping("/api/v1/public/qr/{qrToken}/orders")
     @Transactional
     public ApiResponse<OrderReceipt> placeQrOrder(@PathVariable String qrToken,
-                                                   @Valid @RequestBody PlaceOrderRequest request) {
+                                                   @Valid @RequestBody PlaceOrderRequest request,
+                                                   Authentication authentication) {
+        UUID customerId = requireCustomer(authentication);
         List<QrTable> tables = jdbc.query("""
                 SELECT rt.id AS table_id, rt.tenant_id, rt.branch_id, rt.display_name
                 FROM restaurant_tables rt
@@ -83,10 +85,10 @@ public class OrderController {
         String orderNumber = "R" + UUID.randomUUID().toString().replace("-", "").substring(0, 9).toUpperCase();
         jdbc.update("""
                 INSERT INTO restaurant_orders
-                    (id, tenant_id, branch_id, table_id, order_number, customer_name, notes, total_amount)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    (id, tenant_id, branch_id, table_id, order_number, customer_name, notes, total_amount, customer_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, orderId, table.tenantId(), table.branchId(), table.tableId(), orderNumber,
-                blankToNull(request.customerName()), blankToNull(request.notes()), total);
+                jdbc.queryForObject("SELECT full_name FROM restaurant_customers WHERE id=?", String.class, customerId), blankToNull(request.notes()), total, customerId);
         for (ValidatedOrderLine line : lines) {
             jdbc.update("""
                     INSERT INTO restaurant_order_items
@@ -102,19 +104,21 @@ public class OrderController {
 
     @GetMapping("/api/v1/public/qr/{qrToken}/orders/{orderId}")
     public ApiResponse<PublicOrderStatus> getPublicOrderStatus(@PathVariable String qrToken,
-                                                                @PathVariable UUID orderId) {
+                                                                @PathVariable UUID orderId,
+                                                                Authentication authentication) {
+        UUID customerId = requireCustomer(authentication);
         List<PublicOrderStatus> orders = jdbc.query("""
                 SELECT o.order_number, o.status, o.total_amount, o.created_at
                 FROM restaurant_orders o
                 JOIN restaurant_tables rt ON rt.id = o.table_id AND rt.tenant_id = o.tenant_id
                 JOIN branches b ON b.id = o.branch_id AND b.tenant_id = o.tenant_id
                 JOIN tenants t ON t.id = o.tenant_id
-                WHERE o.id = ? AND rt.qr_token = ? AND rt.is_active = TRUE
+                WHERE o.id = ? AND o.customer_id = ? AND rt.qr_token = ? AND rt.is_active = TRUE
                   AND b.status = 'ACTIVE' AND t.status = 'ACTIVE'
                 """, (rs, row) -> new PublicOrderStatus(
                 rs.getString("order_number"), rs.getString("status"),
                 rs.getBigDecimal("total_amount"), rs.getTimestamp("created_at").toInstant()),
-                orderId, qrToken);
+                orderId, customerId, qrToken);
         if (orders.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found for this table.");
         }
@@ -173,6 +177,15 @@ public class OrderController {
                 """,tenantId,request.branchId(),orderId,actorId,"WAITER_CONFIRMED_SERVED");
         }
         return ApiResponse.success("Order status updated", new OrderStatusUpdated(orderId, status));
+    }
+
+    private UUID requireCustomer(Authentication authentication) {
+        if(authentication==null || !(authentication.getPrincipal() instanceof UUID id) ||
+           authentication.getAuthorities().stream().noneMatch(a->"CUSTOMER".equals(a.getAuthority())))
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"Customer phone login required.");
+        Integer found=jdbc.queryForObject("SELECT COUNT(*) FROM restaurant_customers WHERE id=?",Integer.class,id);
+        if(found==null||found==0) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"Customer account not found.");
+        return id;
     }
 
     private static String blankToNull(String value) {
