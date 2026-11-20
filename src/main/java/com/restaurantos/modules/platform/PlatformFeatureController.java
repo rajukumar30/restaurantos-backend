@@ -50,6 +50,8 @@ public class PlatformFeatureController {
                                               @Valid @RequestBody UpdateFeature request,
                                               Authentication authentication) {
         requireTenant(tenantId);
+        // Serialize feature updates per restaurant to avoid concurrent dependency races.
+        jdbc.queryForObject("SELECT id FROM tenants WHERE id=? FOR UPDATE", UUID.class, tenantId);
         if (authentication == null || !(authentication.getPrincipal() instanceof UUID actorId)) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
         }
@@ -71,6 +73,11 @@ public class PlatformFeatureController {
                 }
             }
         }
+        jdbc.update("""
+            INSERT INTO platform_admin_audit_logs
+                (actor_user_id,tenant_id,action,feature_key,old_value,new_value)
+            VALUES(?,?,'FEATURE_OVERRIDE_UPDATED',?,?,?)
+            """, actorId, tenantId, featureKey, target.enabled(), request.enabled());
         jdbc.update("""
             INSERT INTO tenant_feature_overrides(tenant_id,feature_key,enabled,updated_by)
             VALUES(?,?,?,?)
