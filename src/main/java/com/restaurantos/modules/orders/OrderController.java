@@ -7,6 +7,8 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -37,7 +39,8 @@ public class OrderController {
     public ApiResponse<OrderReceipt> placeQrOrder(@PathVariable String qrToken,
                                                    @Valid @RequestBody PlaceOrderRequest request,
                                                    Authentication authentication) {
-        UUID customerId = requireCustomer(authentication);
+        String guestName = request.customerName().trim();
+        String guestPhone = request.customerPhone();
         List<QrTable> tables = jdbc.query("""
                 SELECT rt.id AS table_id, rt.tenant_id, rt.branch_id, rt.display_name
                 FROM restaurant_tables rt
@@ -85,10 +88,10 @@ public class OrderController {
         String orderNumber = "R" + UUID.randomUUID().toString().replace("-", "").substring(0, 9).toUpperCase();
         jdbc.update("""
                 INSERT INTO restaurant_orders
-                    (id, tenant_id, branch_id, table_id, order_number, customer_name, notes, total_amount, customer_id)
+                    (id, tenant_id, branch_id, table_id, order_number, customer_name, notes, total_amount, customer_phone)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, orderId, table.tenantId(), table.branchId(), table.tableId(), orderNumber,
-                jdbc.queryForObject("SELECT full_name FROM restaurant_customers WHERE id=?", String.class, customerId), blankToNull(request.notes()), total, customerId);
+                guestName, blankToNull(request.notes()), total, guestPhone);
         for (ValidatedOrderLine line : lines) {
             jdbc.update("""
                     INSERT INTO restaurant_order_items
@@ -106,19 +109,18 @@ public class OrderController {
     public ApiResponse<PublicOrderStatus> getPublicOrderStatus(@PathVariable String qrToken,
                                                                 @PathVariable UUID orderId,
                                                                 Authentication authentication) {
-        UUID customerId = requireCustomer(authentication);
         List<PublicOrderStatus> orders = jdbc.query("""
                 SELECT o.order_number, o.status, o.total_amount, o.created_at
                 FROM restaurant_orders o
                 JOIN restaurant_tables rt ON rt.id = o.table_id AND rt.tenant_id = o.tenant_id
                 JOIN branches b ON b.id = o.branch_id AND b.tenant_id = o.tenant_id
                 JOIN tenants t ON t.id = o.tenant_id
-                WHERE o.id = ? AND o.customer_id = ? AND rt.qr_token = ? AND rt.is_active = TRUE
+                WHERE o.id = ? AND rt.qr_token = ? AND rt.is_active = TRUE
                   AND b.status = 'ACTIVE' AND t.status = 'ACTIVE'
                 """, (rs, row) -> new PublicOrderStatus(
                 rs.getString("order_number"), rs.getString("status"),
                 rs.getBigDecimal("total_amount"), rs.getTimestamp("created_at").toInstant()),
-                orderId, customerId, qrToken);
+                orderId, qrToken);
         if (orders.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found for this table.");
         }
