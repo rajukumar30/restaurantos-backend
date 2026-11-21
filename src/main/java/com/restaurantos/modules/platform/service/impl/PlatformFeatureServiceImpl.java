@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import java.util.*;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 
 @Service
 public class PlatformFeatureServiceImpl implements PlatformFeatureService {
@@ -58,8 +60,10 @@ public class PlatformFeatureServiceImpl implements PlatformFeatureService {
                         feature.key() + " requires " + dependency + ". Disable dependent features first.");
             }
         }
+        if (request.expiresAt() != null && !request.expiresAt().isAfter(OffsetDateTime.now(ZoneOffset.UTC)))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Override expiry must be in the future");
         dao.audit(actorId, tenantId, featureKey, target.enabled(), request.enabled());
-        dao.upsertOverride(tenantId, featureKey, request.enabled(), actorId);
+        dao.upsertOverride(tenantId, featureKey, request.enabled(), actorId, request.expiresAt());
         return load(tenantId);
     }
 
@@ -71,7 +75,7 @@ public class PlatformFeatureServiceImpl implements PlatformFeatureService {
         return dao.load(tenantId).stream().map(row -> {
             boolean enabled = row.available() && (row.overrideEnabled() == null || row.overrideEnabled());
             return new Feature(row.key(), row.name(), row.category(), row.description(), row.available(),
-                enabled, row.overrideEnabled(), DEPENDENCIES.getOrDefault(row.key(), List.of()));
+                enabled, row.overrideEnabled(), DEPENDENCIES.getOrDefault(row.key(), List.of()), row.expiresAt());
         }).toList();
     }
 }
