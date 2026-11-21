@@ -21,7 +21,7 @@ public class PlatformEntitlementsDao {
   return jdbc.query("""
    SELECT f.feature_key,f.display_name,f.category,f.available,
     COALESCE(pf.enabled,FALSE) AS plan_included,
-    COALESCE(o.enabled,TRUE) AS restaurant_enabled
+    CASE WHEN o.expires_at IS NULL OR o.expires_at > NOW() THEN COALESCE(o.enabled,TRUE) ELSE TRUE END AS restaurant_enabled
    FROM feature_catalog f
    LEFT JOIN platform_plan_features pf ON pf.feature_key=f.feature_key AND pf.plan_id=?
    LEFT JOIN tenant_feature_overrides o ON o.feature_key=f.feature_key AND o.tenant_id=?
