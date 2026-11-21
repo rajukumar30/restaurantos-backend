@@ -49,6 +49,26 @@ class PlatformEntitlementsServiceImplTest {
   assertEquals("EXPIRED",result.subscriptionStatus());
   assertTrue(result.features().stream().noneMatch(f->f.effectiveEnabled()));
  }
+ @Test void complimentaryGrantEnablesFeatureWithoutPlanSubscription(){
+  when(dao.tenantExists(tenant)).thenReturn(true);
+  when(dao.subscriptions(tenant)).thenReturn(List.of());
+  when(dao.features(tenant,null)).thenReturn(List.of(
+   new FeatureFlags("QR_MENU","QR Menu","GUEST",true,false,true,true)));
+  var result=service.snapshot(tenant);
+  assertEquals("UNASSIGNED",result.subscriptionStatus());
+  var feature=result.features().getFirst();
+  assertTrue(feature.effectiveEnabled());
+  assertEquals("COMPLIMENTARY_GRANT",feature.reason());
+ }
+ @Test void restaurantOverrideDisablesComplimentaryGrant(){
+  when(dao.tenantExists(tenant)).thenReturn(true);
+  when(dao.subscriptions(tenant)).thenReturn(List.of());
+  when(dao.features(tenant,null)).thenReturn(List.of(
+   new FeatureFlags("QR_MENU","QR Menu","GUEST",true,false,false,true)));
+  var feature=service.snapshot(tenant).features().getFirst();
+  assertFalse(feature.effectiveEnabled());
+  assertEquals("RESTAURANT_DISABLED",feature.reason());
+ }
  @Test void disabledPrerequisiteDisablesDependentFeature(){
   when(dao.tenantExists(tenant)).thenReturn(true);
   LocalDate today=LocalDate.now(ZoneOffset.UTC);
