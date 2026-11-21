@@ -33,8 +33,8 @@ public class PlatformEntitlementsServiceImpl implements PlatformEntitlementsServ
   }
   boolean active=eligible,assigned=planId!=null;
   List<Entitlement> features=dao.features(tenantId,planId).stream().map(f->{
-   boolean effective=active&&f.available()&&f.included()&&f.enabled();
-   String reason=!assigned?"NO_SUBSCRIPTION":!active?"SUBSCRIPTION_INACTIVE":!f.available()?"PLATFORM_UNAVAILABLE":!f.included()?"NOT_IN_PLAN":!f.enabled()?"RESTAURANT_DISABLED":"ENABLED";
+   boolean effective=f.available()&&f.enabled()&&((active&&f.included())||f.grantActive());
+   String reason=effective&&f.grantActive()&&!f.included()?"COMPLIMENTARY_GRANT":!assigned?"NO_SUBSCRIPTION":!active?"SUBSCRIPTION_INACTIVE":!f.available()?"PLATFORM_UNAVAILABLE":!f.included()?"NOT_IN_PLAN":!f.enabled()?"RESTAURANT_DISABLED":"ENABLED";
    return new Entitlement(f.key(),f.name(),f.category(),f.available(),f.included(),f.enabled(),effective,reason);
   }).toList();
   return new Snapshot(tenantId,planId,planName,state,eligible,features);
