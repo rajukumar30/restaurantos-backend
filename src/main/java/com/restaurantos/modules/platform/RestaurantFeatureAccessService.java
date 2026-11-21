@@ -38,7 +38,11 @@ public class RestaurantFeatureAccessService {
    """,(rs,i)->new Access(rs.getObject("starts_on",LocalDate.class),
      rs.getObject("ends_on",LocalDate.class),rs.getBoolean("included"),
      rs.getBoolean("available"),rs.getBoolean("restaurant_enabled")),featureKey,tenantId);
-  if(access.isEmpty())return; // Legacy restaurants are not disrupted by rollout.
+  if(access.isEmpty()){
+   Integer previous=jdbc.queryForObject("SELECT COUNT(*) FROM platform_restaurant_subscriptions WHERE tenant_id=?",Integer.class,tenantId);
+   if(previous==null||previous==0)return; // Legacy restaurants without any plan remain grandfathered.
+   throw new ResponseStatusException(HttpStatus.FORBIDDEN,"No active subscription. Please contact restaurant support.");
+  }
   Access a=access.get(0);
   LocalDate now=LocalDate.now(ZoneOffset.UTC);
   if(now.isBefore(a.startsOn()))
