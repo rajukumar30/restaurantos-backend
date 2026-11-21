@@ -28,13 +28,13 @@ public class PlatformEntitlementsServiceImpl implements PlatformEntitlementsServ
    planId=(UUID)s.get("plan_id");planName=(String)s.get("plan_name");
    LocalDate start=(LocalDate)s.get("starts_on");
    LocalDate end=(LocalDate)s.get("ends_on");
-   state=now.isBefore(start)?"SCHEDULED":end!=null&&now.isAfter(end.plusDays(graceDays))?"EXPIRED":end!=null&&now.isAfter(end)?"GRACE_PERIOD":"ACTIVE";
-   eligible="ACTIVE".equals(state)||"GRACE_PERIOD".equals(state);
+   state=now.isBefore(start)?"SCHEDULED":end!=null&&now.isAfter(end)?"EXPIRED":"ACTIVE";
+   eligible="ACTIVE".equals(state);
   }
   boolean active=eligible,assigned=planId!=null;
   List<Entitlement> features=dao.features(tenantId,planId).stream().map(f->{
-   boolean effective=f.available()&&f.enabled()&&((active&&f.included())||f.grantActive());
-   String reason=effective&&f.grantActive()&&!f.included()?"COMPLIMENTARY_GRANT":!f.available()?"PLATFORM_UNAVAILABLE":!f.enabled()?"RESTAURANT_DISABLED":!assigned&&!f.grantActive()?"NO_SUBSCRIPTION":!active&&!f.grantActive()?"SUBSCRIPTION_INACTIVE":!f.included()&&!f.grantActive()?"NOT_IN_PLAN":"ENABLED";
+   boolean effective=f.available()&&f.enabled()&&active&&(f.included()||f.grantActive());
+   String reason=effective&&f.grantActive()&&!f.included()?"COMPLIMENTARY_GRANT":!f.available()?"PLATFORM_UNAVAILABLE":!f.enabled()?"RESTAURANT_DISABLED":!assigned?"NO_SUBSCRIPTION":!active?"SUBSCRIPTION_INACTIVE":!f.included()&&!f.grantActive()?"NOT_IN_PLAN":"ENABLED";
    return new Entitlement(f.key(),f.name(),f.category(),f.available(),f.included(),f.enabled(),effective,reason);
   }).toList();
   Map<String,Entitlement> byKey=new HashMap<>();
