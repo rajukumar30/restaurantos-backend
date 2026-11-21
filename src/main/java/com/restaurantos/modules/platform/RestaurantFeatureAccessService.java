@@ -26,11 +26,8 @@ public class RestaurantFeatureAccessService {
         this.allowLegacyUnassigned=allowLegacyUnassigned;
     }
     public void require(UUID tenantId, String featureKey) {
-        if (!enforcementEnabled) return;
         Access a = dao.latestActive(tenantId, featureKey);
-        if (dao.activeGrant(tenantId, featureKey)) return;
         if (a == null) {
-            if (allowLegacyUnassigned && !dao.hasAnySubscription(tenantId)) return;
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                 "No active subscription. Please contact restaurant support.");
         }
@@ -38,10 +35,10 @@ public class RestaurantFeatureAccessService {
         if (now.isBefore(a.startsOn()))
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                 "Subscription has not started. Contact restaurant support.");
-        if (a.endsOn()!=null && now.isAfter(a.endsOn().plusDays(graceDays)))
+        if (a.endsOn()!=null && now.isAfter(a.endsOn()))
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                 "Subscription expired. Please renew your restaurant plan.");
-        if (!a.available() || !a.included() || !a.restaurantEnabled())
+        if (!a.available() || !(a.included() || a.complimentaryGrant()) || !a.restaurantEnabled())
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                 "This feature is not enabled for your restaurant plan.");
     }
