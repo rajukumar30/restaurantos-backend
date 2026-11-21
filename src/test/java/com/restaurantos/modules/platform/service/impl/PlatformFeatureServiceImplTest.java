@@ -19,20 +19,20 @@ class PlatformFeatureServiceImplTest {
     private void features(boolean ordering) {
         when(dao.tenantExists(tenant)).thenReturn(true);
         when(dao.load(tenant)).thenReturn(List.of(
-            new FeatureRow("QR_MENU","QR Menu","GUEST","",true,true),
-            new FeatureRow("GUEST_ORDERING","Guest Ordering","GUEST","",true,ordering),
-            new FeatureRow("KITCHEN_DISPLAY","Kitchen","STAFF","",true,true)));
+            new FeatureRow("QR_MENU","QR Menu","GUEST","",true,true,null),
+            new FeatureRow("GUEST_ORDERING","Guest Ordering","GUEST","",true,ordering,null),
+            new FeatureRow("KITCHEN_DISPLAY","Kitchen","STAFF","",true,true,null)));
     }
     @Test void deniesDisablingDependencyRequiredByEnabledFeature() {
         features(true);
         assertEquals(HttpStatus.CONFLICT, assertThrows(ResponseStatusException.class,
-            () -> service.update(tenant, "GUEST_ORDERING", new UpdateFeature(false), auth())).getStatusCode());
-        verify(dao, never()).upsertOverride(any(),any(),anyBoolean(),any());
+            () -> service.update(tenant, "GUEST_ORDERING", new UpdateFeature(false,null), auth())).getStatusCode());
+        verify(dao, never()).upsertOverride(any(),any(),anyBoolean(),any(),any());
     }
     @Test void allowsValidChangeAndAudits() {
         features(false);
-        service.update(tenant,"GUEST_ORDERING",new UpdateFeature(true),auth());
-        verify(dao).upsertOverride(tenant,"GUEST_ORDERING",true,actor);
+        service.update(tenant,"GUEST_ORDERING",new UpdateFeature(true,null),auth());
+        verify(dao).upsertOverride(tenant,"GUEST_ORDERING",true,actor,null);
         verify(dao).audit(actor,tenant,"GUEST_ORDERING",false,true);
     }
     @Test void tenantNotFound() {
