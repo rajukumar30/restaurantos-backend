@@ -1,7 +1,6 @@
 package com.restaurantos.modules.realtime.service.impl;
 
 import com.restaurantos.modules.realtime.dto.RealtimeEvent;
-import com.restaurantos.modules.orders.repository.OrderQueryDao;
 import com.restaurantos.modules.realtime.service.RealtimeEventPublisher;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -14,10 +13,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 public class RealtimeEventPublisherImpl implements RealtimeEventPublisher {
     private static final Logger log = LoggerFactory.getLogger(RealtimeEventPublisherImpl.class);
     private final SimpMessagingTemplate messaging;
-    private final OrderQueryDao orders;
 
-    public RealtimeEventPublisherImpl(SimpMessagingTemplate messaging, OrderQueryDao orders) {
-        this.orders = orders;
+    public RealtimeEventPublisherImpl(SimpMessagingTemplate messaging) {
         this.messaging = messaging;
     }
 
