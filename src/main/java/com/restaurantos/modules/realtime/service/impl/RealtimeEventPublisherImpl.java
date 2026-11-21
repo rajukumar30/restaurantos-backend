@@ -38,6 +38,9 @@ public class RealtimeEventPublisherImpl implements RealtimeEventPublisher {
                 try {
                     messaging.convertAndSend("/topic/tenants/" + event.tenantId()
                             + "/branches/" + event.branchId() + "/" + topic, event);
+                    if ("service-requests".equals(topic) && event.payload().containsKey("tableId")) {
+                        messaging.convertAndSend("/topic/guest/tables/" + event.payload().get("tableId") + "/service-requests", event);
+                    }
                     if ("orders".equals(topic)) {
                         messaging.convertAndSend("/topic/guest/orders/" + event.resourceId(), event);
                     }
