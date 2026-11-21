@@ -17,7 +17,7 @@ public class RestaurantFeatureAccessService {
     private final boolean enforcementEnabled;
     private final int graceDays;
     public RestaurantFeatureAccessService(RestaurantFeatureAccessDao dao,
-        @Value("${restaurantos.entitlements.enforce:false}") boolean enforcementEnabled,
+        @Value("${restaurantos.entitlements.enforce:true}") boolean enforcementEnabled,
         @Value("${restaurantos.entitlements.grace-days:7}") int graceDays) {
         this.dao=dao; this.enforcementEnabled=enforcementEnabled;
         this.graceDays=Math.max(0,Math.min(90,graceDays));
