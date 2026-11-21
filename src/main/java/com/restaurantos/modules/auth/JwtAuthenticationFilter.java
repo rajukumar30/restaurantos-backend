@@ -1,30 +1,26 @@
 package com.restaurantos.modules.auth;
 
+import com.restaurantos.modules.auth.repository.PlatformAdminAccessDao;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.*;
+import jakarta.servlet.http.*;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.filter.OncePerRequestFilter;
-
 import java.io.IOException;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtService jwtService;
-    private final JdbcTemplate jdbc;
+    private final PlatformAdminAccessDao adminAccess;
 
-    public JwtAuthenticationFilter(JwtService jwtService, JdbcTemplate jdbc) {
+    public JwtAuthenticationFilter(JwtService jwtService, PlatformAdminAccessDao adminAccess) {
         this.jwtService = jwtService;
-        this.jdbc = jdbc;
+        this.adminAccess = adminAccess;
     }
 
     @Override
@@ -38,18 +34,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 List<?> roles = claims.get("authorities", List.class);
                 var authorities = roles == null ? List.<SimpleGrantedAuthority>of() :
                     roles.stream().map(String::valueOf).map(SimpleGrantedAuthority::new).toList();
-                // A signed token alone cannot preserve revoked platform access.
-                if (request.getRequestURI().startsWith("/api/v1/platform/")) {
-                    Integer active = jdbc.queryForObject("""
-                        SELECT COUNT(*) FROM platform_admins pa
-                        JOIN app_users u ON u.id=pa.user_id
-                        WHERE pa.user_id=? AND pa.status='ACTIVE' AND u.status='ACTIVE'
-                        """, Integer.class, userId);
-                    if (active == null || active == 0) {
-                        SecurityContextHolder.clearContext();
-                        response.sendError(HttpServletResponse.SC_FORBIDDEN, "Platform administrator access revoked");
-                        return;
-                    }
+                // Revalidate revoked platform accounts even when their signed JWT has not expired.
+                if (request.getRequestURI().startsWith("/api/v1/platform/")
+                    && !adminAccess.active(userId)) {
+                    SecurityContextHolder.clearContext();
+                    response.sendError(HttpServletResponse.SC_FORBIDDEN, "Platform administrator access revoked");
+                    return;
                 }
                 var authentication = new UsernamePasswordAuthenticationToken(userId, null, authorities);
                 SecurityContextHolder.getContext().setAuthentication(authentication);
