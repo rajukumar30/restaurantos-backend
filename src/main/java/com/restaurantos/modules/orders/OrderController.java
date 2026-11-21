@@ -2,6 +2,7 @@ package com.restaurantos.modules.orders;
 
 import com.restaurantos.common.api.ApiResponse;
 import com.restaurantos.modules.staff.TenantAccessService;
+import com.restaurantos.modules.platform.RestaurantFeatureAccessService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -28,10 +29,12 @@ import java.util.UUID;
 public class OrderController {
     private final JdbcTemplate jdbc;
     private final TenantAccessService access;
+    private final RestaurantFeatureAccessService featureAccess;
 
-    public OrderController(JdbcTemplate jdbc, TenantAccessService access) {
+    public OrderController(JdbcTemplate jdbc, TenantAccessService access, RestaurantFeatureAccessService featureAccess) {
         this.jdbc = jdbc;
         this.access = access;
+        this.featureAccess = featureAccess;
     }
 
     @PostMapping("/api/v1/public/qr/{qrToken}/orders")
@@ -53,6 +56,7 @@ public class OrderController {
                 rs.getObject("branch_id", UUID.class), rs.getString("display_name")), qrToken);
         if (tables.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "This table QR code is invalid or inactive.");
         QrTable table = tables.get(0);
+        featureAccess.require(table.tenantId(), "GUEST_ORDERING");
 
         Map<UUID, Integer> quantities = new LinkedHashMap<>();
         for (OrderLineRequest line : request.items()) {
