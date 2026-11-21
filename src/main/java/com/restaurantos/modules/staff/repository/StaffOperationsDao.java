@@ -32,6 +32,7 @@ public class StaffOperationsDao {
    JOIN user_roles ur ON ur.tenant_user_id=tu.id AND ur.tenant_id=tu.tenant_id
    JOIN role_permissions rp ON rp.role_id=ur.role_id
    JOIN permissions p ON p.id=rp.permission_id
+   JOIN tenants t ON t.id=tu.tenant_id AND t.status='ACTIVE'
    WHERE tu.tenant_id=? AND tu.user_id=? AND tu.status='ACTIVE'
     AND (ur.branch_id IS NULL OR ur.branch_id=?)
    """,(rs,i)->rs.getString(1),tenantId,userId,branchId);
