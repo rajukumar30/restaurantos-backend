@@ -1,5 +1,6 @@
 package com.restaurantos.modules.staff.service.impl;
 import com.restaurantos.modules.staff.TenantAccessService;
+import com.restaurantos.modules.realtime.service.RealtimeEventPublisher;
 import com.restaurantos.modules.staff.dto.StaffBillingDto.PaymentRequest;
 import com.restaurantos.modules.staff.repository.StaffBillingDao;
 import org.junit.jupiter.api.Test;
@@ -13,7 +14,7 @@ class StaffBillingServiceImplTest {
  private final StaffBillingDao dao=mock(StaffBillingDao.class);
  private final TenantAccessService access=mock(TenantAccessService.class);
  private final Authentication auth=mock(Authentication.class);
- private final StaffBillingServiceImpl service=new StaffBillingServiceImpl(dao,access);
+ private final StaffBillingServiceImpl service=new StaffBillingServiceImpl(dao,access,mock(RealtimeEventPublisher.class));
  private final UUID tenant=UUID.randomUUID(),branch=UUID.randomUUID(),order=UUID.randomUUID(),actor=UUID.randomUUID();
  private void allow(){when(access.requirePermission(auth,tenant,branch,"payments:read")).thenReturn(actor);
   when(dao.cashier(tenant,branch,actor)).thenReturn(true);}
