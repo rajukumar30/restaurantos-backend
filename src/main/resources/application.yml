@@ -45,4 +45,4 @@ restaurantos:
     admin-password: ${PLATFORM_ADMIN_PASSWORD:}
     admin-name: ${PLATFORM_ADMIN_NAME:Platform Administrator}
   cors:
-    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,https://restaurantos-frontend-git-5b3cfe-hypertextrjgmailcoms-projects.vercel.app}
