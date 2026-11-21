@@ -1,6 +1,8 @@
 package com.restaurantos.modules.staff.service.impl;
 import com.restaurantos.modules.staff.TenantAccessService;
 import com.restaurantos.modules.platform.TenantFeatureAccess;
+import com.restaurantos.modules.realtime.dto.RealtimeEvent;
+import com.restaurantos.modules.realtime.service.RealtimeEventPublisher;
 import com.restaurantos.modules.staff.dto.StaffOperationsDto.KitchenStatusRequest;
 import com.restaurantos.modules.staff.repository.StaffOperationsDao;
 import com.restaurantos.modules.staff.service.StaffOperationsService;
@@ -15,7 +17,8 @@ public class StaffOperationsServiceImpl implements StaffOperationsService {
  private final StaffOperationsDao dao;
  private final TenantAccessService access;
  private final TenantFeatureAccess features;
- public StaffOperationsServiceImpl(StaffOperationsDao dao,TenantAccessService access,TenantFeatureAccess features){this.dao=dao;this.access=access;this.features=features;}
+ private final RealtimeEventPublisher events;
+ public StaffOperationsServiceImpl(StaffOperationsDao dao,TenantAccessService access,TenantFeatureAccess features,RealtimeEventPublisher events){this.dao=dao;this.access=access;this.features=features;this.events=events;}
  @Transactional(readOnly=true)
  public List<Map<String,Object>> branches(UUID tenantId,Authentication auth){
   if(auth==null||!(auth.getPrincipal() instanceof UUID userId))
@@ -48,6 +51,7 @@ public class StaffOperationsServiceImpl implements StaffOperationsService {
   if(dao.updateStatus(tenantId,request.branchId(),orderId,"SERVED","READY")==0)
    throw new ResponseStatusException(HttpStatus.CONFLICT,"Order must be READY before kitchen handoff");
   dao.recordKitchenHandoff(tenantId,request.branchId(),orderId,userId);
+  events.publishAfterCommit(RealtimeEvent.orderChanged("ORDER_STATUS_CHANGED",tenantId,request.branchId(),orderId));
   return Map.of("orderId",orderId,"status","SERVED");
  }
  @Transactional
@@ -64,6 +68,7 @@ public class StaffOperationsServiceImpl implements StaffOperationsService {
   };
   if(dao.updateStatus(tenantId,request.branchId(),orderId,target,from)==0)
    throw new ResponseStatusException(HttpStatus.CONFLICT,"Order was updated or is not in the expected state");
+  events.publishAfterCommit(RealtimeEvent.orderChanged("KITCHEN_STATUS_CHANGED",tenantId,request.branchId(),orderId));
   return Map.of("orderId",orderId,"status",target);
  }
 }
