@@ -3,6 +3,7 @@ import com.restaurantos.modules.orders.dto.OrderDto.*;
 import com.restaurantos.modules.orders.repository.OrderQueryDao;
 import com.restaurantos.modules.orders.service.OrderQueryService;
 import com.restaurantos.modules.staff.TenantAccessService;
+import com.restaurantos.modules.platform.RestaurantFeatureAccessService;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -13,7 +14,8 @@ import java.util.*;
 public class OrderQueryServiceImpl implements OrderQueryService {
  private final OrderQueryDao dao;
  private final TenantAccessService access;
- public OrderQueryServiceImpl(OrderQueryDao dao,TenantAccessService access){this.dao=dao;this.access=access;}
+ private final RestaurantFeatureAccessService featureAccess;
+ public OrderQueryServiceImpl(OrderQueryDao dao,TenantAccessService access,RestaurantFeatureAccessService featureAccess){this.dao=dao;this.access=access;this.featureAccess=featureAccess;}
  @Transactional(readOnly=true)
  public PublicOrderStatus publicStatus(String qrToken,UUID orderId){
   List<PublicOrderStatus> results=dao.publicStatus(qrToken,orderId);
@@ -24,12 +26,14 @@ public class OrderQueryServiceImpl implements OrderQueryService {
  public List<OrderSummary> list(UUID tenantId,UUID branchId,Authentication auth){
   access.requirePermission(auth,tenantId,branchId,"orders:read");
   access.requireBranchInTenant(tenantId,branchId);
+  featureAccess.require(tenantId,"GUEST_ORDERING");
   return dao.list(tenantId,branchId);
  }
  @Transactional
  public OrderStatusUpdated updateStatus(UUID tenantId,UUID orderId,UpdateOrderStatusRequest request,Authentication auth){
   access.requirePermission(auth,tenantId,request.branchId(),"orders:manage");
   access.requireBranchInTenant(tenantId,request.branchId());
+  featureAccess.require(tenantId,"GUEST_ORDERING");
   String status=request.status().trim().toUpperCase(Locale.ROOT);
   if(!List.of("SERVED","CANCELLED").contains(status))
    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Unsupported order status.");
