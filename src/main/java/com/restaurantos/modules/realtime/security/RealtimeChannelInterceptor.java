@@ -6,6 +6,7 @@ import com.restaurantos.modules.auth.repository.PlatformAdminAccessDao;
 import com.restaurantos.modules.platform.TenantFeatureAccess;
 import com.restaurantos.modules.staff.repository.TenantAccessDao;
 import com.restaurantos.modules.orders.repository.OrderQueryDao;
+import com.restaurantos.modules.service.repository.ServiceRequestDao;
 import io.jsonwebtoken.JwtException;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
@@ -28,6 +29,8 @@ public class RealtimeChannelInterceptor implements ChannelInterceptor {
     private static final Pattern ORDER_TOPIC = Pattern.compile(
         "^/topic/tenants/([0-9a-fA-F-]{36})/branches/([0-9a-fA-F-]{36})/(orders|service-requests)$");
     private static final Pattern GUEST_ORDER_TOPIC = Pattern.compile("^/topic/guest/orders/([0-9a-fA-F-]{36})$");
+    private static final Pattern GUEST_SERVICE_TOPIC = Pattern.compile("^/topic/guest/tables/([0-9a-fA-F-]{36})/service-requests$");
+    private final ServiceRequestDao serviceRequests;
     private final OrderQueryDao orders;
     private final JwtService jwt;
     private final AuthDao auth;
@@ -36,7 +39,8 @@ public class RealtimeChannelInterceptor implements ChannelInterceptor {
     private final TenantFeatureAccess features;
 
     public RealtimeChannelInterceptor(JwtService jwt, AuthDao auth, PlatformAdminAccessDao admins,
-                                      TenantAccessDao access, TenantFeatureAccess features, OrderQueryDao orders) {
+                                      TenantAccessDao access, TenantFeatureAccess features, OrderQueryDao orders, ServiceRequestDao serviceRequests) {
+        this.serviceRequests = serviceRequests;
         this.orders = orders;
         this.jwt = jwt;
         this.auth = auth;
@@ -81,6 +85,16 @@ public class RealtimeChannelInterceptor implements ChannelInterceptor {
                 Object qr = headers.getSessionAttributes() == null ? null : headers.getSessionAttributes().get("guestQr");
                 if (!(qr instanceof String qrToken) || orders.publicStatus(qrToken, UUID.fromString(guest.group(1))).isEmpty())
                     throw new SecurityException("Guest order subscription denied");
+                return message;
+            }
+            Matcher guestService = GUEST_SERVICE_TOPIC.matcher(destination == null ? "" : destination);
+            if (guestService.matches()) {
+                Object qr = headers.getSessionAttributes() == null ? null : headers.getSessionAttributes().get("guestQr");
+                if (!(qr instanceof String qrToken)) throw new SecurityException("Guest table authentication required");
+                var tables = serviceRequests.tables(qrToken);
+                if (tables.isEmpty() || !tables.getFirst().id().equals(UUID.fromString(guestService.group(1)))
+                        || !features.enabled(tables.getFirst().tenantId(), "SERVICE_REQUESTS"))
+                    throw new SecurityException("Guest service subscription denied");
                 return message;
             }
             Principal principal = headers.getUser();
