@@ -5,13 +5,15 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import org.springframework.beans.factory.annotation.Value;
 import java.util.*;
 
 @RestController
 @RequestMapping("/api/v1/platform/restaurants")
 public class PlatformEntitlementsController {
  private final JdbcTemplate jdbc;
- public PlatformEntitlementsController(JdbcTemplate jdbc){this.jdbc=jdbc;}
+ private final int graceDays;
+ public PlatformEntitlementsController(JdbcTemplate jdbc,@Value("${restaurantos.entitlements.grace-days:7}") int graceDays){this.jdbc=jdbc;this.graceDays=Math.max(0,Math.min(90,graceDays));}
  public record Entitlement(String key,String name,String category,boolean platformAvailable,
    boolean planIncluded,boolean restaurantEnabled,boolean effectiveEnabled,String reason){}
  public record Snapshot(UUID tenantId,UUID planId,String planName,String subscriptionStatus,
@@ -31,11 +33,11 @@ public class PlatformEntitlementsController {
   if(!subscriptions.isEmpty()){
    Map<String,Object> s=subscriptions.get(0);
    planId=(UUID)s.get("plan_id");planName=(String)s.get("plan_name");
-   LocalDate start=((java.sql.Date)s.get("starts_on")).toLocalDate();
+   LocalDate start=(LocalDate)s.get("starts_on");
    Object endValue=s.get("ends_on");
-   LocalDate end=endValue==null?null:((java.sql.Date)endValue).toLocalDate();
-   state=now.isBefore(start)?"SCHEDULED":end!=null&&now.isAfter(end)?"EXPIRED":"ACTIVE";
-   eligible="ACTIVE".equals(state);
+   LocalDate end=endValue==null?null:(LocalDate)endValue;
+   state=now.isBefore(start)?"SCHEDULED":end!=null&&now.isAfter(end.plusDays(graceDays))?"EXPIRED":end!=null&&now.isAfter(end)?"GRACE_PERIOD":"ACTIVE";
+   eligible="ACTIVE".equals(state)||"GRACE_PERIOD".equals(state);
   }
   final UUID selectedPlan=planId;final boolean active=eligible;final boolean assigned=planId!=null;
   List<Entitlement> features=jdbc.query("""
