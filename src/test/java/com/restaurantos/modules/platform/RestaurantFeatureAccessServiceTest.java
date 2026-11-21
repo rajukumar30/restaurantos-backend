@@ -15,17 +15,22 @@ class RestaurantFeatureAccessServiceTest {
     private final UUID tenant=UUID.randomUUID();
 
     @Test void disabledEnforcementDoesNotHitDatabase() {
-        new RestaurantFeatureAccessService(dao,false,7).require(tenant,"GUEST_ORDERING");
+        new RestaurantFeatureAccessService(dao,false,7,false).require(tenant,"GUEST_ORDERING");
         verifyNoInteractions(dao);
     }
     @Test void grandfatheredTenantWithoutPlanIsAllowed() {
-        new RestaurantFeatureAccessService(dao,true,7).require(tenant,"GUEST_ORDERING");
+        new RestaurantFeatureAccessService(dao,true,7,true).require(tenant,"GUEST_ORDERING");
         verify(dao).hasAnySubscription(tenant);
+    }
+    @Test void unassignedTenantDeniedByDefault() {
+        var service=new RestaurantFeatureAccessService(dao,true,7,false);
+        assertEquals(HttpStatus.FORBIDDEN,assertThrows(ResponseStatusException.class,
+            ()->service.require(tenant,"QR_MENU")).getStatusCode());
     }
     @Test void expiredSubscriptionIsRejectedAfterGracePeriod() {
         when(dao.latestActive(tenant,"GUEST_ORDERING")).thenReturn(new Access(
-            LocalDate.now().minusDays(40),LocalDate.now().minusDays(20),true,true,true));
-        var service = new RestaurantFeatureAccessService(dao,true,7);
+            LocalDate.now().minusDays(40),LocalDate.now().minusDays(20),true,true,true,false));
+        var service = new RestaurantFeatureAccessService(dao,true,7,false);
         assertEquals(HttpStatus.FORBIDDEN,assertThrows(ResponseStatusException.class,
             () -> service.require(tenant,"GUEST_ORDERING")).getStatusCode());
     }
