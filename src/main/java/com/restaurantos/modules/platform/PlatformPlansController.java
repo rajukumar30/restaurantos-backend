@@ -15,7 +15,8 @@ import java.util.UUID;
 @RequestMapping("/api/v1/platform/plans")
 public class PlatformPlansController {
  private final PlanService service;
- public PlatformPlansController(PlanService service){this.service=service;}
+ private final com.restaurantos.modules.subscription.repository.SubscriptionPlanDao planDao;
+ public PlatformPlansController(PlanService service,com.restaurantos.modules.subscription.repository.SubscriptionPlanDao planDao){this.service=service;this.planDao=planDao;}
  private void requireAdmin(Authentication authentication){
   if(authentication==null||!(authentication.getPrincipal() instanceof UUID))
    throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"Authentication required");
@@ -29,6 +30,13 @@ public class PlatformPlansController {
  @PatchMapping("/{id}")
  public ApiResponse<SubscriptionPlan> update(@PathVariable UUID id,@RequestBody PlanRequest request,Authentication authentication){
   requireAdmin(authentication);return ApiResponse.success("Plan updated",service.update(id,request));
+ }
+ @GetMapping("/{id}/feature-editable")
+ public ApiResponse<Boolean> featureEditable(@PathVariable UUID id,Authentication authentication){
+  requireAdmin(authentication);
+  var plan=planDao.findById(id);
+  if(plan==null)throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Plan not found");
+  return ApiResponse.success("Feature edit permission", "DRAFT".equals(plan.status()) || ("ARCHIVED".equals(plan.status()) && !planDao.hasSubscriptions(id)));
  }
  @PostMapping("/{id}/activate")
  public ApiResponse<SubscriptionPlan> activate(@PathVariable UUID id,Authentication authentication){
