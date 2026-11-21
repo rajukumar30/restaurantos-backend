@@ -11,6 +11,7 @@ import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
+import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.stereotype.Component;
 import java.security.Principal;
@@ -22,7 +23,7 @@ import java.util.regex.Pattern;
 @Component
 public class RealtimeChannelInterceptor implements ChannelInterceptor {
     private static final Pattern ORDER_TOPIC = Pattern.compile(
-        "^/topic/tenants/([0-9a-fA-F-]{36})/branches/([0-9a-fA-F-]{36})/orders$");
+        "^/topic/tenants/([0-9a-fA-F-]{36})/branches/([0-9a-fA-F-]{36})/(orders|service-requests)$");
     private final JwtService jwt;
     private final AuthDao auth;
     private final PlatformAdminAccessDao admins;
@@ -40,7 +41,8 @@ public class RealtimeChannelInterceptor implements ChannelInterceptor {
 
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
-        StompHeaderAccessor headers = StompHeaderAccessor.wrap(message);
+        StompHeaderAccessor headers = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
+        if (headers == null) return message;
         StompCommand command = headers.getCommand();
         if (command == null) return message;
         if (command == StompCommand.CONNECT) {
@@ -64,9 +66,10 @@ public class RealtimeChannelInterceptor implements ChannelInterceptor {
             if (!match.matches()) throw new SecurityException("Subscription not allowed");
             UUID tenantId = UUID.fromString(match.group(1));
             UUID branchId = UUID.fromString(match.group(2));
+            String topic = match.group(3);
             if (!access.activeBranchExists(tenantId, branchId)
                     || !access.hasPermission(userId, tenantId, branchId, "orders:read")
-                    || !features.enabled(tenantId, "GUEST_ORDERING"))
+                    || !features.enabled(tenantId, "service-requests".equals(topic) ? "SERVICE_REQUESTS" : "GUEST_ORDERING"))
                 throw new SecurityException("Subscription access denied");
         } else if (command == StompCommand.SEND) {
             // Clients never publish events directly; business mutations use authenticated REST.
