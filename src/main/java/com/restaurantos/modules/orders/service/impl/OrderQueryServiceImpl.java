@@ -3,7 +3,7 @@ import com.restaurantos.modules.orders.dto.OrderDto.*;
 import com.restaurantos.modules.orders.repository.OrderQueryDao;
 import com.restaurantos.modules.orders.service.OrderQueryService;
 import com.restaurantos.modules.staff.TenantAccessService;
-import com.restaurantos.modules.platform.RestaurantFeatureAccessService;
+import com.restaurantos.modules.platform.TenantFeatureAccess;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -14,8 +14,8 @@ import java.util.*;
 public class OrderQueryServiceImpl implements OrderQueryService {
  private final OrderQueryDao dao;
  private final TenantAccessService access;
- private final RestaurantFeatureAccessService featureAccess;
- public OrderQueryServiceImpl(OrderQueryDao dao,TenantAccessService access,RestaurantFeatureAccessService featureAccess){this.dao=dao;this.access=access;this.featureAccess=featureAccess;}
+ private final TenantFeatureAccess featureAccess;
+ public OrderQueryServiceImpl(OrderQueryDao dao,TenantAccessService access,TenantFeatureAccess featureAccess){this.dao=dao;this.access=access;this.featureAccess=featureAccess;}
  @Transactional(readOnly=true)
  public PublicOrderStatus publicStatus(String qrToken,UUID orderId){
   List<PublicOrderStatus> results=dao.publicStatus(qrToken,orderId);
