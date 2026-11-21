@@ -4,6 +4,8 @@ import com.restaurantos.modules.orders.entity.*;
 import com.restaurantos.modules.orders.repository.OrderPlacementDao;
 import com.restaurantos.modules.orders.service.OrderPlacementService;
 import com.restaurantos.modules.platform.TenantFeatureAccess;
+import com.restaurantos.modules.realtime.dto.RealtimeEvent;
+import com.restaurantos.modules.realtime.service.RealtimeEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,8 +16,9 @@ import java.util.*;
 public class OrderPlacementServiceImpl implements OrderPlacementService {
  private final OrderPlacementDao dao;
  private final TenantFeatureAccess featureAccess;
- public OrderPlacementServiceImpl(OrderPlacementDao dao,TenantFeatureAccess featureAccess){
-  this.dao=dao;this.featureAccess=featureAccess;
+ private final RealtimeEventPublisher events;
+ public OrderPlacementServiceImpl(OrderPlacementDao dao,TenantFeatureAccess featureAccess,RealtimeEventPublisher events){
+  this.dao=dao;this.featureAccess=featureAccess;this.events=events;
  }
  @Override
  @Transactional
@@ -54,6 +57,7 @@ public class OrderPlacementServiceImpl implements OrderPlacementService {
   String notes=request.notes()==null||request.notes().isBlank()?null:request.notes().trim();
   dao.createOrder(orderId,orderNumber,table,visitId,request.customerName().trim(),request.customerPhone(),notes,total);
   for(ValidatedOrderLine line:lines)dao.createOrderItem(table.tenantId(),orderId,line);
+  events.publishAfterCommit(RealtimeEvent.orderChanged("ORDER_CREATED",table.tenantId(),table.branchId(),orderId));
   return new OrderReceipt(orderId,orderNumber,table.displayName(),total,"NEW");
  }
 }
