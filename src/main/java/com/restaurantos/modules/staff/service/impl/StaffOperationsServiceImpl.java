@@ -1,5 +1,6 @@
 package com.restaurantos.modules.staff.service.impl;
 import com.restaurantos.modules.staff.TenantAccessService;
+import com.restaurantos.modules.platform.TenantFeatureAccess;
 import com.restaurantos.modules.staff.dto.StaffOperationsDto.KitchenStatusRequest;
 import com.restaurantos.modules.staff.repository.StaffOperationsDao;
 import com.restaurantos.modules.staff.service.StaffOperationsService;
@@ -13,7 +14,8 @@ import java.util.*;
 public class StaffOperationsServiceImpl implements StaffOperationsService {
  private final StaffOperationsDao dao;
  private final TenantAccessService access;
- public StaffOperationsServiceImpl(StaffOperationsDao dao,TenantAccessService access){this.dao=dao;this.access=access;}
+ private final TenantFeatureAccess features;
+ public StaffOperationsServiceImpl(StaffOperationsDao dao,TenantAccessService access,TenantFeatureAccess features){this.dao=dao;this.access=access;this.features=features;}
  @Transactional(readOnly=true)
  public List<Map<String,Object>> branches(UUID tenantId,Authentication auth){
   if(auth==null||!(auth.getPrincipal() instanceof UUID userId))
@@ -40,6 +42,7 @@ public class StaffOperationsServiceImpl implements StaffOperationsService {
  public Map<String,Object> kitchenServed(UUID tenantId,UUID orderId,KitchenStatusRequest request,Authentication auth){
   UUID userId=access.requirePermission(auth,tenantId,request.branchId(),"kitchen:operate");
   access.requireBranchInTenant(tenantId,request.branchId());
+  features.require(tenantId,"KITCHEN_DISPLAY");
   if(!"KITCHEN_MANAGED".equals(dao.mode(tenantId,request.branchId())))
    throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Kitchen handoff is not enabled for this branch");
   if(dao.updateStatus(tenantId,request.branchId(),orderId,"SERVED","READY")==0)
@@ -51,6 +54,7 @@ public class StaffOperationsServiceImpl implements StaffOperationsService {
  public Map<String,Object> kitchenStatus(UUID tenantId,UUID orderId,KitchenStatusRequest request,Authentication auth){
   access.requirePermission(auth,tenantId,request.branchId(),"kitchen:operate");
   access.requireBranchInTenant(tenantId,request.branchId());
+  features.require(tenantId,"KITCHEN_DISPLAY");
   String target=request.status().trim().toUpperCase(Locale.ROOT);
   String from=switch(target){
    case "ACCEPTED"->"NEW";
