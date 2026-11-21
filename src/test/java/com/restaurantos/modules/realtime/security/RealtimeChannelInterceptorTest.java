@@ -82,4 +82,35 @@ class RealtimeChannelInterceptorTest {
         when(features.enabled(tenant, "GUEST_ORDERING")).thenReturn(true);
         assertNotNull(interceptor.preSend(message(headers), null));
     }
+    @Test
+    void allowsAuthorizedServiceRequestSubscription() {
+        StompHeaderAccessor headers = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
+        headers.setUser(new UsernamePasswordAuthenticationToken(user, null, List.of()));
+        headers.setDestination("/topic/tenants/" + tenant + "/branches/" + branch + "/service-requests");
+        when(access.activeBranchExists(tenant, branch)).thenReturn(true);
+        when(access.hasPermission(user, tenant, branch, "orders:read")).thenReturn(true);
+        when(features.enabled(tenant, "SERVICE_REQUESTS")).thenReturn(true);
+        assertNotNull(interceptor.preSend(message(headers), null));
+    }
+
+    @Test
+    void rejectsServiceRequestSubscriptionWithoutEntitlement() {
+        StompHeaderAccessor headers = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
+        headers.setUser(new UsernamePasswordAuthenticationToken(user, null, List.of()));
+        headers.setDestination("/topic/tenants/" + tenant + "/branches/" + branch + "/service-requests");
+        when(access.activeBranchExists(tenant, branch)).thenReturn(true);
+        when(access.hasPermission(user, tenant, branch, "orders:read")).thenReturn(true);
+        assertThrows(SecurityException.class, () -> interceptor.preSend(message(headers), null));
+    }
+
+    @Test
+    void rejectsServiceRequestSubscriptionForOtherTenant() {
+        StompHeaderAccessor headers = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
+        headers.setUser(new UsernamePasswordAuthenticationToken(user, null, List.of()));
+        headers.setDestination("/topic/tenants/" + tenant + "/branches/" + branch + "/service-requests");
+        when(access.activeBranchExists(tenant, branch)).thenReturn(true);
+        when(features.enabled(tenant, "SERVICE_REQUESTS")).thenReturn(true);
+        assertThrows(SecurityException.class, () -> interceptor.preSend(message(headers), null));
+    }
+
 }
