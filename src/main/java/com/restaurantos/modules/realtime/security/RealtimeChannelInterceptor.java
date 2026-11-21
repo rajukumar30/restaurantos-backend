@@ -5,6 +5,7 @@ import com.restaurantos.modules.auth.repository.AuthDao;
 import com.restaurantos.modules.auth.repository.PlatformAdminAccessDao;
 import com.restaurantos.modules.platform.TenantFeatureAccess;
 import com.restaurantos.modules.staff.repository.TenantAccessDao;
+import com.restaurantos.modules.orders.repository.OrderQueryDao;
 import io.jsonwebtoken.JwtException;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
@@ -26,6 +27,8 @@ import java.util.regex.Pattern;
 public class RealtimeChannelInterceptor implements ChannelInterceptor {
     private static final Pattern ORDER_TOPIC = Pattern.compile(
         "^/topic/tenants/([0-9a-fA-F-]{36})/branches/([0-9a-fA-F-]{36})/(orders|service-requests)$");
+    private static final Pattern GUEST_ORDER_TOPIC = Pattern.compile("^/topic/guest/orders/([0-9a-fA-F-]{36})$");
+    private final OrderQueryDao orders;
     private final JwtService jwt;
     private final AuthDao auth;
     private final PlatformAdminAccessDao admins;
@@ -33,7 +36,8 @@ public class RealtimeChannelInterceptor implements ChannelInterceptor {
     private final TenantFeatureAccess features;
 
     public RealtimeChannelInterceptor(JwtService jwt, AuthDao auth, PlatformAdminAccessDao admins,
-                                      TenantAccessDao access, TenantFeatureAccess features) {
+                                      TenantAccessDao access, TenantFeatureAccess features, OrderQueryDao orders) {
+        this.orders = orders;
         this.jwt = jwt;
         this.auth = auth;
         this.admins = admins;
@@ -49,7 +53,14 @@ public class RealtimeChannelInterceptor implements ChannelInterceptor {
         if (command == null) return message;
         if (command == StompCommand.CONNECT) {
             String bearer = headers.getFirstNativeHeader("Authorization");
-            if (bearer == null || !bearer.startsWith("Bearer ")) throw new SecurityException("Authentication required");
+            if (bearer == null || !bearer.startsWith("Bearer ")) {
+                String guestQr = headers.getFirstNativeHeader("X-Guest-QR");
+                if (guestQr == null || guestQr.isBlank() || guestQr.length() > 256)
+                    throw new SecurityException("Authentication required");
+                if (headers.getSessionAttributes() == null) throw new SecurityException("Session unavailable");
+                headers.getSessionAttributes().put("guestQr", guestQr);
+                return message;
+            }
             try {
                 UUID userId = UUID.fromString(jwt.parse(bearer.substring(7)).getSubject());
                 if (!admins.active(userId) && auth.activeMemberships(userId).isEmpty())
@@ -64,6 +75,14 @@ public class RealtimeChannelInterceptor implements ChannelInterceptor {
                 throw new SecurityException("Invalid or expired credentials");
             }
         } else if (command == StompCommand.SUBSCRIBE) {
+            String destination = headers.getDestination();
+            Matcher guest = GUEST_ORDER_TOPIC.matcher(destination == null ? "" : destination);
+            if (guest.matches()) {
+                Object qr = headers.getSessionAttributes() == null ? null : headers.getSessionAttributes().get("guestQr");
+                if (!(qr instanceof String qrToken) || orders.publicStatus(qrToken, UUID.fromString(guest.group(1))).isEmpty())
+                    throw new SecurityException("Guest order subscription denied");
+                return message;
+            }
             Principal principal = headers.getUser();
             if (!(principal instanceof UsernamePasswordAuthenticationToken token)
                     || !(token.getPrincipal() instanceof UUID userId))
@@ -71,7 +90,6 @@ public class RealtimeChannelInterceptor implements ChannelInterceptor {
             Object expiresAt = headers.getSessionAttributes() == null ? null : headers.getSessionAttributes().get("jwtExpiresAt");
             if (!(expiresAt instanceof Long expiry) || expiry <= System.currentTimeMillis())
                 throw new SecurityException("Session expired; reconnect required");
-            String destination = headers.getDestination();
             Matcher match = ORDER_TOPIC.matcher(destination == null ? "" : destination);
             if (!match.matches()) throw new SecurityException("Subscription not allowed");
             UUID tenantId = UUID.fromString(match.group(1));
