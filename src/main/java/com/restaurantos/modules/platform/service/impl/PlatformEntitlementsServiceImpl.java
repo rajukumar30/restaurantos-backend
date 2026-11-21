@@ -8,7 +8,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import java.time.*;
-import java.sql.Date;
 import java.util.*;
 @Service
 public class PlatformEntitlementsServiceImpl implements PlatformEntitlementsService {
@@ -58,7 +57,7 @@ public class PlatformEntitlementsServiceImpl implements PlatformEntitlementsServ
  private static LocalDate toLocalDate(Object value){
   if(value==null)return null;
   if(value instanceof LocalDate date)return date;
-  if(value instanceof Date date)return date.toLocalDate();
+  if(value instanceof java.util.Date)return LocalDate.parse(value.toString());
   throw new IllegalStateException("Unexpected subscription date type: "+value.getClass().getName());
  }
  private boolean dependencyEnabled(String key,Map<String,Entitlement> features,
