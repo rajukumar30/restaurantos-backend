@@ -13,7 +13,7 @@ public class TenantFeatureAccessDao {
         Boolean enabled = jdbc.queryForObject("""
             SELECT CASE WHEN t.status <> 'ACTIVE' THEN FALSE
                         WHEN f.available = FALSE THEN FALSE
-                        ELSE COALESCE(o.enabled, TRUE) END
+                        ELSE CASE WHEN o.expires_at IS NULL OR o.expires_at > NOW() THEN COALESCE(o.enabled,TRUE) ELSE TRUE END END
             FROM tenants t CROSS JOIN feature_catalog f
             LEFT JOIN tenant_feature_overrides o
               ON o.tenant_id=t.id AND o.feature_key=f.feature_key
