@@ -10,24 +10,27 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.UUID;
 
-/** Server-side feature gate. Enabled by default; unassigned legacy tenants remain grandfathered in. */
+/** Server-side feature gate. Enabled by default; legacy grandfathering requires explicit configuration. */
 @Service
 public class RestaurantFeatureAccessService {
     private final RestaurantFeatureAccessDao dao;
     private final boolean enforcementEnabled;
     private final int graceDays;
+    private final boolean allowLegacyUnassigned;
     public RestaurantFeatureAccessService(RestaurantFeatureAccessDao dao,
         @Value("${restaurantos.entitlements.enforce:true}") boolean enforcementEnabled,
-        @Value("${restaurantos.entitlements.grace-days:7}") int graceDays) {
+        @Value("${restaurantos.entitlements.grace-days:7}") int graceDays,
+        @Value("${restaurantos.entitlements.allow-legacy-unassigned:false}") boolean allowLegacyUnassigned) {
         this.dao=dao; this.enforcementEnabled=enforcementEnabled;
         this.graceDays=Math.max(0,Math.min(90,graceDays));
+        this.allowLegacyUnassigned=allowLegacyUnassigned;
     }
     public void require(UUID tenantId, String featureKey) {
         if (!enforcementEnabled) return;
         Access a = dao.latestActive(tenantId, featureKey);
         if (dao.activeGrant(tenantId, featureKey)) return;
         if (a == null) {
-            if (!dao.hasAnySubscription(tenantId)) return;
+            if (allowLegacyUnassigned && !dao.hasAnySubscription(tenantId)) return;
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                 "No active subscription. Please contact restaurant support.");
         }
