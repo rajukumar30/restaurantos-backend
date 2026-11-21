@@ -14,7 +14,7 @@ public class StaffOperationsDao {
     AND (ur.branch_id IS NULL OR ur.branch_id=b.id)
    JOIN role_permissions rp ON rp.role_id=ur.role_id
    JOIN permissions p ON p.id=rp.permission_id AND p.permission_key='orders:read'
-   WHERE b.tenant_id=? AND b.status='ACTIVE' ORDER BY b.name
+   JOIN tenants t ON t.id=b.tenant_id AND t.status='ACTIVE'\n   WHERE b.tenant_id=? AND b.status='ACTIVE' ORDER BY b.name
    """,userId,tenantId);
  }
  public List<String> roles(UUID tenantId,UUID userId,UUID branchId){
@@ -22,7 +22,7 @@ public class StaffOperationsDao {
    SELECT DISTINCT r.role_key FROM tenant_users tu
    JOIN user_roles ur ON ur.tenant_user_id=tu.id AND ur.tenant_id=tu.tenant_id
    JOIN roles r ON r.id=ur.role_id
-   WHERE tu.tenant_id=? AND tu.user_id=? AND tu.status='ACTIVE'
+   JOIN tenants t ON t.id=tu.tenant_id AND t.status='ACTIVE'\n   WHERE tu.tenant_id=? AND tu.user_id=? AND tu.status='ACTIVE'
     AND (ur.branch_id IS NULL OR ur.branch_id=?)
    """,(rs,i)->rs.getString(1),tenantId,userId,branchId);
  }
