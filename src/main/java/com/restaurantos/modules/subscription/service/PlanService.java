@@ -9,4 +9,5 @@ public interface PlanService {
  SubscriptionPlan update(UUID id,PlanRequest request);
  SubscriptionPlan activate(UUID id);
  SubscriptionPlan deactivate(UUID id);
+ SubscriptionPlan reactivate(UUID id);
 }
