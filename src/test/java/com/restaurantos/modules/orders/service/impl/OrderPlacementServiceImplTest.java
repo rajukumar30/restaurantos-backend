@@ -22,6 +22,14 @@ class OrderPlacementServiceImplTest {
   assertThrows(ResponseStatusException.class,()->service.place("invalid",request(List.of(new OrderLineRequest(item,1)))));
   verify(dao,never()).createOrder(any(),any(),any(),any(),any(),any(),any(),any());
  }
+ @Test void deniesOrderPlacementWhenQrMenuDependencyIsUnavailable(){
+  when(dao.findActiveTable("qr")).thenReturn(List.of(new QrTable(tableId,tenant,branch,"Table 1")));
+  doThrow(new ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN))
+   .when(feature).require(tenant,"GUEST_ORDERING");
+  assertThrows(ResponseStatusException.class,()->service.place("qr",request(List.of(new OrderLineRequest(item,1)))));
+  verify(dao,never()).lockTable(any());
+  verify(dao,never()).createOrder(any(),any(),any(),any(),any(),any(),any(),any());
+ }
  @Test void rejectsCombinedQuantityOverLimit(){
   when(dao.findActiveTable("qr")).thenReturn(List.of(new QrTable(tableId,tenant,branch,"Table 1")));
   assertThrows(ResponseStatusException.class,()->service.place("qr",request(List.of(new OrderLineRequest(item,15),new OrderLineRequest(item,6)))));
