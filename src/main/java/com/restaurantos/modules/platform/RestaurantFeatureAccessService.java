@@ -10,7 +10,7 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.UUID;
 
-/** Server-side feature gate. Disabled by default; unassigned legacy tenants remain grandfathered in. */
+/** Server-side feature gate. Enabled by default; unassigned legacy tenants remain grandfathered in. */
 @Service
 public class RestaurantFeatureAccessService {
     private final RestaurantFeatureAccessDao dao;
