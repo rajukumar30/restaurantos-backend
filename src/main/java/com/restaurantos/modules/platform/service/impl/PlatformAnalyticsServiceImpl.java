@@ -11,6 +11,7 @@ import java.util.List;
 
 import com.restaurantos.modules.platform.dto.PlatformAnalyticsDto.*;
 import com.restaurantos.modules.platform.service.PlatformAnalyticsService;
+import com.restaurantos.modules.platform.PlatformAnalyticsDao;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 @Service
