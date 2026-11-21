@@ -17,6 +17,14 @@ public class AuthDao {
   Integer count=jdbc.queryForObject("SELECT COUNT(*) FROM platform_admins WHERE user_id=? AND status='ACTIVE'",Integer.class,userId);
   return count!=null&&count>0;
  }
+ public List<String> roleKeys(UUID userId,UUID tenantId){
+  return jdbc.query("""
+   SELECT DISTINCT r.role_key FROM tenant_users tu
+   JOIN user_roles ur ON ur.tenant_user_id=tu.id AND ur.tenant_id=tu.tenant_id
+   JOIN roles r ON r.id=ur.role_id
+   WHERE tu.user_id=? AND tu.tenant_id=? AND tu.status='ACTIVE'
+   """,(rs,i)->rs.getString(1),userId,tenantId);
+ }
  public List<TenantMembership> activeMemberships(UUID userId){
   return jdbc.query("""
    SELECT tu.tenant_id,t.name AS tenant_name,
