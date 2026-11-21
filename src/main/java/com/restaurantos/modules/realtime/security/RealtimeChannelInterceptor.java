@@ -15,6 +15,8 @@ import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.stereotype.Component;
 import java.security.Principal;
+import java.time.Instant;
+import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -52,6 +54,11 @@ public class RealtimeChannelInterceptor implements ChannelInterceptor {
                 UUID userId = UUID.fromString(jwt.parse(bearer.substring(7)).getSubject());
                 if (!admins.active(userId) && auth.activeMemberships(userId).isEmpty())
                     throw new SecurityException("Account access revoked");
+                Date expiration = jwt.parse(bearer.substring(7)).getExpiration();
+                if (expiration == null || !expiration.toInstant().isAfter(Instant.now()))
+                    throw new SecurityException("Expired credentials");
+                if (headers.getSessionAttributes() != null)
+                    headers.getSessionAttributes().put("jwtExpiresAt", expiration.toInstant().toEpochMilli());
                 headers.setUser(new UsernamePasswordAuthenticationToken(userId, null, List.of()));
             } catch (JwtException | IllegalArgumentException e) {
                 throw new SecurityException("Invalid or expired credentials");
@@ -61,6 +68,9 @@ public class RealtimeChannelInterceptor implements ChannelInterceptor {
             if (!(principal instanceof UsernamePasswordAuthenticationToken token)
                     || !(token.getPrincipal() instanceof UUID userId))
                 throw new SecurityException("Authentication required");
+            Object expiresAt = headers.getSessionAttributes() == null ? null : headers.getSessionAttributes().get("jwtExpiresAt");
+            if (!(expiresAt instanceof Long expiry) || expiry <= System.currentTimeMillis())
+                throw new SecurityException("Session expired; reconnect required");
             String destination = headers.getDestination();
             Matcher match = ORDER_TOPIC.matcher(destination == null ? "" : destination);
             if (!match.matches()) throw new SecurityException("Subscription not allowed");
