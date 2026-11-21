@@ -55,6 +55,20 @@ public class PlanServiceImpl implements PlanService {
   return find(id);
  }
  @Transactional
+ public SubscriptionPlan createVersion(UUID id){
+  SubscriptionPlan source=dao.lockById(id);
+  if(source==null)throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Plan not found");
+  // A distinct plan ID preserves every existing subscription and its original entitlements.
+  String suffix=" - Revision "+UUID.randomUUID().toString().substring(0,8);
+  String base=source.name();
+  String name=base.substring(0,Math.min(base.length(),100-suffix.length()))+suffix;
+  try{
+   UUID copy=dao.insert(name,source.description(),source.monthlyPricePaise(),source.annualPricePaise());
+   dao.copyFeatures(id,copy);
+   return find(copy);
+  }catch(DuplicateKeyException ex){throw new ResponseStatusException(HttpStatus.CONFLICT,"Unable to generate unique plan revision");}
+ }
+ @Transactional
  public SubscriptionPlan reactivate(UUID id){
   if(dao.changeStatus(id,"ARCHIVED","ACTIVE")==0)
    throw new ResponseStatusException(HttpStatus.CONFLICT,"Only deactivated plans can be reactivated");
