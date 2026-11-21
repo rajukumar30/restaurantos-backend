@@ -21,14 +21,14 @@ public class PlatformEntitlementsDao {
   return jdbc.query("""
    SELECT f.feature_key,f.display_name,f.category,f.available,
     COALESCE(pf.enabled,FALSE) AS plan_included,
-    CASE WHEN o.expires_at IS NULL OR o.expires_at > NOW() THEN COALESCE(o.enabled,TRUE) ELSE TRUE END AS restaurant_enabled
+    CASE WHEN o.expires_at IS NULL OR o.expires_at > NOW() THEN COALESCE(o.enabled,TRUE) ELSE TRUE END AS restaurant_enabled,\n    FALSE AS complimentary_grant
    FROM feature_catalog f
    LEFT JOIN platform_plan_features pf ON pf.feature_key=f.feature_key AND pf.plan_id=?
    LEFT JOIN tenant_feature_overrides o ON o.feature_key=f.feature_key AND o.tenant_id=?
    ORDER BY f.category,f.display_name
    """,(rs,i)->new FeatureFlags(rs.getString("feature_key"),rs.getString("display_name"),
     rs.getString("category"),rs.getBoolean("available"),rs.getBoolean("plan_included"),
-    rs.getBoolean("restaurant_enabled"),rs.getBoolean("complimentary_grant")),planId,tenantId,tenantId);
+    rs.getBoolean("restaurant_enabled"),rs.getBoolean("complimentary_grant")),planId,tenantId);
  }
  public record FeatureFlags(String key,String name,String category,boolean available,boolean included,boolean enabled,boolean grantActive){}
 }
