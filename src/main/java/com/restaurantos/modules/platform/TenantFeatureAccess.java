@@ -19,13 +19,18 @@ public class TenantFeatureAccess {
         "TAKEAWAY",List.of("GUEST_ORDERING")
     );
     private final TenantFeatureAccessDao dao;
-    public TenantFeatureAccess(TenantFeatureAccessDao dao) { this.dao=dao; }
+    private final RestaurantFeatureAccessService subscriptionGate;
+    public TenantFeatureAccess(TenantFeatureAccessDao dao, RestaurantFeatureAccessService subscriptionGate) {
+        this.dao=dao; this.subscriptionGate=subscriptionGate;
+    }
     public boolean enabled(UUID tenantId, String featureKey) {
         return enabledRecursive(tenantId,featureKey,new HashSet<>());
     }
     private boolean enabledRecursive(UUID tenantId, String featureKey, Set<String> visited) {
         if (!visited.add(featureKey)) return false;
         if (!dao.enabled(tenantId,featureKey)) return false;
+        try { subscriptionGate.require(tenantId, featureKey); }
+        catch (ResponseStatusException denied) { return false; }
         for (String dependency : DEPENDENCIES.getOrDefault(featureKey,List.of())) {
             if (!enabledRecursive(tenantId,dependency,visited)) return false;
         }
