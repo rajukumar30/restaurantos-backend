@@ -19,7 +19,7 @@ public class TenantAccessDao {
             JOIN tenants t ON t.id=tu.tenant_id
             WHERE tu.tenant_id=? AND tu.user_id=? AND tu.status='ACTIVE'
               AND t.status='ACTIVE' AND p.permission_key=?
-              AND (ur.branch_id IS NULL OR (? IS NOT NULL AND ur.branch_id=?))
+              AND (ur.branch_id IS NULL OR (CAST(? AS UUID) IS NOT NULL AND ur.branch_id=?))
             """, Integer.class, tenantId, userId, permission, branchId, branchId);
         return count != null && count > 0;
     }
