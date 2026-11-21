@@ -46,7 +46,7 @@ public class SecurityConfig {
 
     @Bean
     CorsConfigurationSource corsConfigurationSource(
-            @Value("${restaurantos.cors.allowed-origins:http://localhost:3000}") String allowedOrigins) {
+            @Value("${restaurantos.cors.allowed-origins:https://restaurantos-frontend-git-5b3cfe-hypertextrjgmailcoms-projects.vercel.app}") String allowedOrigins) {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(Arrays.stream(allowedOrigins.split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList());
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
