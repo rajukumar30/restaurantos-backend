@@ -49,7 +49,7 @@ class PlatformEntitlementsServiceImplTest {
   assertEquals("EXPIRED",result.subscriptionStatus());
   assertTrue(result.features().stream().noneMatch(f->f.effectiveEnabled()));
  }
- @Test void complimentaryGrantEnablesFeatureWithoutPlanSubscription(){
+ @Test void complimentaryGrantDoesNotBypassMissingPlan(){
   when(dao.tenantExists(tenant)).thenReturn(true);
   when(dao.subscriptions(tenant)).thenReturn(List.of());
   when(dao.features(tenant,null)).thenReturn(List.of(
@@ -57,8 +57,8 @@ class PlatformEntitlementsServiceImplTest {
   var result=service.snapshot(tenant);
   assertEquals("UNASSIGNED",result.subscriptionStatus());
   var feature=result.features().getFirst();
-  assertTrue(feature.effectiveEnabled());
-  assertEquals("COMPLIMENTARY_GRANT",feature.reason());
+  assertFalse(feature.effectiveEnabled());
+  assertEquals("NO_SUBSCRIPTION",feature.reason());
  }
  @Test void restaurantOverrideDisablesComplimentaryGrant(){
   when(dao.tenantExists(tenant)).thenReturn(true);
