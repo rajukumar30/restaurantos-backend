@@ -44,7 +44,7 @@ public class ServiceRequestServiceImpl implements ServiceRequestService {
   if(!active.isEmpty())return active.getFirst();
   UUID id=UUID.randomUUID();
   dao.insert(id,table,request);
-  events.publishServiceRequestAfterCommit(RealtimeEvent.orderChanged("SERVICE_REQUEST_CREATED",table.tenantId(),table.branchId(),id));
+  events.publishServiceRequestAfterCommit(serviceEvent("SERVICE_REQUEST_CREATED",table.tenantId(),table.branchId(),id,table.id()));
   return new ServiceRequest(id,request.type(),"REQUESTED",request.notes(),Instant.now(),null);
  }
  @Transactional(readOnly=true)
@@ -60,7 +60,7 @@ public class ServiceRequestServiceImpl implements ServiceRequestService {
   if(dao.cancel(requestId,table)==0)
    throw new ResponseStatusException(HttpStatus.CONFLICT,"Request cannot be cancelled");
   ServiceRequest result=getOne(requestId,table.tenantId(),table.branchId());
-  events.publishServiceRequestAfterCommit(RealtimeEvent.orderChanged("SERVICE_REQUEST_CANCELLED",table.tenantId(),table.branchId(),requestId));
+  events.publishServiceRequestAfterCommit(serviceEvent("SERVICE_REQUEST_CANCELLED",table.tenantId(),table.branchId(),requestId,table.id()));
   return result;
  }
  @Transactional(readOnly=true)
@@ -80,8 +80,12 @@ public class ServiceRequestServiceImpl implements ServiceRequestService {
   if(dao.update(requestId,tenantId,branchId,request.status(),staff)==0)
    throw new ResponseStatusException(HttpStatus.CONFLICT,"Request status has changed");
   ServiceRequest result=getOne(requestId,tenantId,branchId);
-  events.publishServiceRequestAfterCommit(RealtimeEvent.orderChanged("SERVICE_REQUEST_UPDATED",tenantId,branchId,requestId));
+  events.publishServiceRequestAfterCommit(serviceEvent("SERVICE_REQUEST_UPDATED",tenantId,branchId,requestId,dao.requestTable(requestId,tenantId,branchId).getFirst()));
   return result;
+ }
+ private RealtimeEvent serviceEvent(String type,UUID tenantId,UUID branchId,UUID requestId,UUID tableId){
+  return new RealtimeEvent(UUID.randomUUID(),type,tenantId,branchId,requestId,1,Instant.now(),
+   Map.of("tableId",tableId.toString()));
  }
  private ServiceRequest getOne(UUID id,UUID tenantId,UUID branchId){
   List<ServiceRequest> rows=dao.find(id,tenantId,branchId);
