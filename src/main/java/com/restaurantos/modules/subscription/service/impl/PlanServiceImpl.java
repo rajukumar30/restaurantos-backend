@@ -38,14 +38,26 @@ public class PlanServiceImpl implements PlanService {
  public SubscriptionPlan update(UUID id,PlanRequest raw){
   PlanRequest r=validate(raw);
   try{
-   if(dao.updateDraft(id,r.name(),r.description(),r.monthlyPricePaise(),r.annualPricePaise())==0)
-    throw new ResponseStatusException(HttpStatus.CONFLICT,"Only draft plans can be edited");
+   SubscriptionPlan current=find(id);
+   if("ARCHIVED".equals(current.status()) && dao.hasSubscriptions(id))
+    throw new ResponseStatusException(HttpStatus.CONFLICT,"This plan has subscription history. Create a new draft to change its pricing.");
+   int updated="ARCHIVED".equals(current.status())
+    ?dao.updateArchivedUnused(id,r.name(),r.description(),r.monthlyPricePaise(),r.annualPricePaise())
+    :dao.updateDraft(id,r.name(),r.description(),r.monthlyPricePaise(),r.annualPricePaise());
+   if(updated==0)
+    throw new ResponseStatusException(HttpStatus.CONFLICT,"Only draft plans or archived plans without subscriptions can be edited");
    return find(id);
   }catch(DuplicateKeyException ex){throw new ResponseStatusException(HttpStatus.CONFLICT,"A plan with this name already exists");}
  }
  @Transactional
  public SubscriptionPlan activate(UUID id){
   if(dao.changeStatus(id,"DRAFT","ACTIVE")==0)throw new ResponseStatusException(HttpStatus.CONFLICT,"Only draft plans can be activated");
+  return find(id);
+ }
+ @Transactional
+ public SubscriptionPlan reactivate(UUID id){
+  if(dao.changeStatus(id,"ARCHIVED","ACTIVE")==0)
+   throw new ResponseStatusException(HttpStatus.CONFLICT,"Only deactivated plans can be reactivated");
   return find(id);
  }
  @Transactional
