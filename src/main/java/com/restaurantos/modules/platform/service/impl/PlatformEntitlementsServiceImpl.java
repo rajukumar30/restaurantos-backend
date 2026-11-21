@@ -26,8 +26,8 @@ public class PlatformEntitlementsServiceImpl implements PlatformEntitlementsServ
   if(!subscriptions.isEmpty()){
    Map<String,Object> s=subscriptions.getFirst();
    planId=(UUID)s.get("plan_id");planName=(String)s.get("plan_name");
-   LocalDate start=(LocalDate)s.get("starts_on");
-   LocalDate end=(LocalDate)s.get("ends_on");
+   LocalDate start=toLocalDate(s.get("starts_on"));
+   LocalDate end=toLocalDate(s.get("ends_on"));
    state=now.isBefore(start)?"SCHEDULED":end!=null&&now.isAfter(end)?"EXPIRED":"ACTIVE";
    eligible="ACTIVE".equals(state);
   }
@@ -53,6 +53,12 @@ public class PlatformEntitlementsServiceImpl implements PlatformEntitlementsServ
     feature.platformAvailable(),feature.planIncluded(),feature.restaurantEnabled(),false,"DEPENDENCY_DISABLED");
   }).toList();
   return new Snapshot(tenantId,planId,planName,state,eligible,resolved);
+ }
+ private static LocalDate toLocalDate(Object value){
+  if(value==null)return null;
+  if(value instanceof LocalDate date)return date;
+  if(value instanceof java.sql.Date date)return date.toLocalDate();
+  throw new IllegalStateException("Unexpected subscription date type: "+value.getClass().getName());
  }
  private boolean dependencyEnabled(String key,Map<String,Entitlement> features,
    Map<String,List<String>> dependencies,Set<String> visited){
