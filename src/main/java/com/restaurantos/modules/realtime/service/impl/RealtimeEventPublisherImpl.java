@@ -17,6 +17,15 @@ public class RealtimeEventPublisherImpl implements RealtimeEventPublisher {
 
     @Override
     public void publishAfterCommit(RealtimeEvent event) {
+        publish(event, "orders");
+    }
+
+    @Override
+    public void publishServiceRequestAfterCommit(RealtimeEvent event) {
+        publish(event, "service-requests");
+    }
+
+    private void publish(RealtimeEvent event, String topic) {
         if (!TransactionSynchronizationManager.isActualTransactionActive()
                 || !TransactionSynchronizationManager.isSynchronizationActive())
             throw new IllegalStateException("Realtime events must be registered inside a transaction");
@@ -24,7 +33,7 @@ public class RealtimeEventPublisherImpl implements RealtimeEventPublisher {
             @Override
             public void afterCommit() {
                 messaging.convertAndSend("/topic/tenants/" + event.tenantId()
-                        + "/branches/" + event.branchId() + "/orders", event);
+                        + "/branches/" + event.branchId() + "/" + topic, event);
             }
         });
     }
