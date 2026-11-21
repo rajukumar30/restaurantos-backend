@@ -1,5 +1,7 @@
 package com.restaurantos.modules.auth.service.impl;
 import com.restaurantos.modules.auth.JwtService;
+import com.restaurantos.modules.platform.TenantFeatureAccess;
+import com.restaurantos.modules.auth.dto.TenantMembership;
 import com.restaurantos.modules.auth.dto.LoginRequest;
 import com.restaurantos.modules.auth.entity.AuthUser;
 import com.restaurantos.modules.auth.repository.AuthDao;
@@ -14,7 +16,8 @@ class AuthServiceImplTest {
  private final AuthDao dao=mock(AuthDao.class);
  private final PasswordEncoder encoder=mock(PasswordEncoder.class);
  private final JwtService jwt=mock(JwtService.class);
- private final AuthServiceImpl service=new AuthServiceImpl(dao,encoder,jwt);
+ private final TenantFeatureAccess features=mock(TenantFeatureAccess.class);
+ private final AuthServiceImpl service=new AuthServiceImpl(dao,encoder,jwt,features);
  @Test void unknownUserRejected(){
   when(dao.findByEmail("nobody@example.com")).thenReturn(List.of());
   assertThrows(ResponseStatusException.class,()->service.login(new LoginRequest("nobody@example.com","password")));
@@ -33,5 +36,31 @@ class AuthServiceImplTest {
   when(encoder.matches("good","hash")).thenReturn(true);
   assertThrows(ResponseStatusException.class,()->service.login(new LoginRequest("a@example.com","good")));
   verifyNoInteractions(jwt);
+ }
+ @Test void kitchenOnlyAccountCannotLoginWithoutKitchenFeature(){
+  UUID userId=UUID.randomUUID(),tenant=UUID.randomUUID();
+  when(dao.findByEmail("kitchen@example.com")).thenReturn(List.of(new AuthUser(userId,"Kitchen","kitchen@example.com","hash","ACTIVE")));
+  when(encoder.matches("good","hash")).thenReturn(true);
+  when(dao.activeMemberships(userId)).thenReturn(List.of(new TenantMembership(tenant,"Restaurant","Kitchen")));
+  when(dao.roleKeys(userId,tenant)).thenReturn(List.of("KITCHEN"));
+  assertThrows(ResponseStatusException.class,()->service.login(new LoginRequest("kitchen@example.com","good")));
+  verifyNoInteractions(jwt);
+ }
+ @Test void waiterOnlyAccountCannotLoginWithoutWaiterFeature(){
+  UUID userId=UUID.randomUUID(),tenant=UUID.randomUUID();
+  when(dao.findByEmail("waiter@example.com")).thenReturn(List.of(new AuthUser(userId,"Waiter","waiter@example.com","hash","ACTIVE")));
+  when(encoder.matches("good","hash")).thenReturn(true);
+  when(dao.activeMemberships(userId)).thenReturn(List.of(new TenantMembership(tenant,"Restaurant","Waiter")));
+  when(dao.roleKeys(userId,tenant)).thenReturn(List.of("WAITER"));
+  assertThrows(ResponseStatusException.class,()->service.login(new LoginRequest("waiter@example.com","good")));
+  verifyNoInteractions(jwt);
+ }
+ @Test void ownerCanLoginEvenWhenKitchenAndWaiterAreUnavailable(){
+  UUID userId=UUID.randomUUID(),tenant=UUID.randomUUID();
+  when(dao.findByEmail("owner@example.com")).thenReturn(List.of(new AuthUser(userId,"Owner","owner@example.com","hash","ACTIVE")));
+  when(encoder.matches("good","hash")).thenReturn(true);
+  when(dao.activeMemberships(userId)).thenReturn(List.of(new TenantMembership(tenant,"Restaurant","Owner")));
+  when(dao.roleKeys(userId,tenant)).thenReturn(List.of("OWNER"));
+  assertDoesNotThrow(()->service.login(new LoginRequest("owner@example.com","good")));
  }
 }
