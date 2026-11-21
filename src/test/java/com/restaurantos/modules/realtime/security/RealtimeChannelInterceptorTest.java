@@ -39,6 +39,9 @@ class RealtimeChannelInterceptorTest {
     }
 
     private org.springframework.messaging.Message<byte[]> message(StompHeaderAccessor headers) {
+        if (headers.getCommand() == StompCommand.SUBSCRIBE) {
+            headers.setSessionAttributes(new java.util.HashMap<>(java.util.Map.of("jwtExpiresAt", System.currentTimeMillis() + 60000L)));
+        }
         headers.setLeaveMutable(true);
         return MessageBuilder.createMessage(new byte[0], headers.getMessageHeaders());
     }
