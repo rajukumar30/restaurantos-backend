@@ -39,7 +39,7 @@ class RealtimeChannelInterceptorTest {
     }
 
     private org.springframework.messaging.Message<byte[]> message(StompHeaderAccessor headers) {
-        if (headers.getCommand() == StompCommand.SUBSCRIBE) {
+        if (headers.getCommand() == StompCommand.SUBSCRIBE && headers.getSessionAttributes() == null) {
             headers.setSessionAttributes(new java.util.HashMap<>(java.util.Map.of("jwtExpiresAt", System.currentTimeMillis() + 60000L)));
         }
         headers.setLeaveMutable(true);
@@ -113,6 +113,18 @@ class RealtimeChannelInterceptorTest {
         headers.setDestination("/topic/tenants/" + tenant + "/branches/" + branch + "/service-requests");
         when(access.activeBranchExists(tenant, branch)).thenReturn(true);
         when(features.enabled(tenant, "SERVICE_REQUESTS")).thenReturn(true);
+        assertThrows(SecurityException.class, () -> interceptor.preSend(message(headers), null));
+    }
+
+    @Test
+    void rejectsExpiredSessionEvenWithExistingPermission() {
+        StompHeaderAccessor headers = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
+        headers.setUser(new UsernamePasswordAuthenticationToken(user, null, List.of()));
+        headers.setSessionAttributes(new java.util.HashMap<>(java.util.Map.of("jwtExpiresAt", System.currentTimeMillis() - 1000L)));
+        headers.setDestination("/topic/tenants/" + tenant + "/branches/" + branch + "/orders");
+        when(access.activeBranchExists(tenant, branch)).thenReturn(true);
+        when(access.hasPermission(user, tenant, branch, "orders:read")).thenReturn(true);
+        when(features.enabled(tenant, "GUEST_ORDERING")).thenReturn(true);
         assertThrows(SecurityException.class, () -> interceptor.preSend(message(headers), null));
     }
 
