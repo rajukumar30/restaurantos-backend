@@ -54,4 +54,13 @@ public class PlatformEntitlementsServiceImpl implements PlatformEntitlementsServ
   }).toList();
   return new Snapshot(tenantId,planId,planName,state,eligible,resolved);
  }
+ private boolean dependencyEnabled(String key,Map<String,Entitlement> features,
+   Map<String,List<String>> dependencies,Set<String> visited){
+  if(!visited.add(key))return false;
+  Entitlement entitlement=features.get(key);
+  if(entitlement==null||!entitlement.effectiveEnabled())return false;
+  return dependencies.getOrDefault(key,List.of()).stream()
+   .allMatch(dep->dependencyEnabled(dep,features,dependencies,new HashSet<>(visited)));
+ }
+
 }
