@@ -12,6 +12,7 @@ import java.util.UUID;
 
 import com.restaurantos.modules.staff.dto.TenantBranchDto.*;
 import com.restaurantos.modules.staff.service.TenantBranchService;
+import com.restaurantos.modules.staff.TenantBranchDao;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 @Service
