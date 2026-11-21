@@ -3,6 +3,8 @@ import com.restaurantos.modules.service.dto.ServiceRequestDto.*;
 import com.restaurantos.modules.service.repository.ServiceRequestDao;
 import com.restaurantos.modules.service.service.ServiceRequestService;
 import com.restaurantos.modules.platform.TenantFeatureAccess;
+import com.restaurantos.modules.realtime.dto.RealtimeEvent;
+import com.restaurantos.modules.realtime.service.RealtimeEventPublisher;
 import com.restaurantos.modules.staff.TenantAccessService;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
@@ -16,8 +18,9 @@ public class ServiceRequestServiceImpl implements ServiceRequestService {
  private final ServiceRequestDao dao;
  private final TenantAccessService access;
  private final TenantFeatureAccess features;
- public ServiceRequestServiceImpl(ServiceRequestDao dao,TenantAccessService access,TenantFeatureAccess features){
-  this.dao=dao;this.access=access;this.features=features;
+ private final RealtimeEventPublisher events;
+ public ServiceRequestServiceImpl(ServiceRequestDao dao,TenantAccessService access,TenantFeatureAccess features,RealtimeEventPublisher events){
+  this.dao=dao;this.access=access;this.features=features;this.events=events;
  }
  private TableInfo table(String qrToken){
   List<TableInfo> tables=dao.tables(qrToken);
@@ -41,6 +44,7 @@ public class ServiceRequestServiceImpl implements ServiceRequestService {
   if(!active.isEmpty())return active.getFirst();
   UUID id=UUID.randomUUID();
   dao.insert(id,table,request);
+  events.publishServiceRequestAfterCommit(RealtimeEvent.orderChanged("SERVICE_REQUEST_CREATED",table.tenantId(),table.branchId(),id));
   return new ServiceRequest(id,request.type(),"REQUESTED",request.notes(),Instant.now(),null);
  }
  @Transactional(readOnly=true)
@@ -55,7 +59,9 @@ public class ServiceRequestServiceImpl implements ServiceRequestService {
   features.require(table.tenantId(),"SERVICE_REQUESTS");
   if(dao.cancel(requestId,table)==0)
    throw new ResponseStatusException(HttpStatus.CONFLICT,"Request cannot be cancelled");
-  return getOne(requestId,table.tenantId(),table.branchId());
+  ServiceRequest result=getOne(requestId,table.tenantId(),table.branchId());
+  events.publishServiceRequestAfterCommit(RealtimeEvent.orderChanged("SERVICE_REQUEST_CANCELLED",table.tenantId(),table.branchId(),requestId));
+  return result;
  }
  @Transactional(readOnly=true)
  public List<ServiceRequest> staffList(UUID tenantId,UUID branchId,Authentication auth){
@@ -73,7 +79,9 @@ public class ServiceRequestServiceImpl implements ServiceRequestService {
    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid status transition");
   if(dao.update(requestId,tenantId,branchId,request.status(),staff)==0)
    throw new ResponseStatusException(HttpStatus.CONFLICT,"Request status has changed");
-  return getOne(requestId,tenantId,branchId);
+  ServiceRequest result=getOne(requestId,tenantId,branchId);
+  events.publishServiceRequestAfterCommit(RealtimeEvent.orderChanged("SERVICE_REQUEST_UPDATED",tenantId,branchId,requestId));
+  return result;
  }
  private ServiceRequest getOne(UUID id,UUID tenantId,UUID branchId){
   List<ServiceRequest> rows=dao.find(id,tenantId,branchId);
