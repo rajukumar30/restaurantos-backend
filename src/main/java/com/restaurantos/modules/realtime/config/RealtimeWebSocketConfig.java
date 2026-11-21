@@ -16,7 +16,7 @@ public class RealtimeWebSocketConfig implements WebSocketMessageBrokerConfigurer
     private final String[] origins;
 
     public RealtimeWebSocketConfig(RealtimeChannelInterceptor security,
-            @Value("${restaurantos.cors.allowed-origins:http://localhost:3000}") String allowedOrigins) {
+            @Value("${restaurantos.cors.allowed-origins:https://restaurantos-frontend-git-5b3cfe-hypertextrjgmailcoms-projects.vercel.app}") String allowedOrigins) {
         this.security = security;
         this.origins = java.util.Arrays.stream(allowedOrigins.split(",")).map(String::trim)
                 .filter(s -> !s.isBlank()).toArray(String[]::new);
