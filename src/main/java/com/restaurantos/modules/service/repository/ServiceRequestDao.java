@@ -20,6 +20,10 @@ public class ServiceRequestDao {
    """,(rs,i)->new TableInfo(rs.getObject(1,UUID.class),rs.getObject(2,UUID.class),
     rs.getObject(3,UUID.class)),token);
  }
+ public List<UUID> requestTable(UUID requestId,UUID tenantId,UUID branchId){
+  return jdbc.query("SELECT table_id FROM service_requests WHERE id=? AND tenant_id=? AND branch_id=?",
+   (rs,i)->rs.getObject(1,UUID.class),requestId,tenantId,branchId);
+ }
  public void lockTable(UUID id){jdbc.queryForObject("SELECT id FROM restaurant_tables WHERE id=? FOR UPDATE",UUID.class,id);}
  public List<ServiceRequest> active(UUID tableId,String type){
   return jdbc.query("""
