@@ -5,6 +5,7 @@ import com.restaurantos.modules.auth.repository.AuthDao;
 import com.restaurantos.modules.auth.repository.PlatformAdminAccessDao;
 import com.restaurantos.modules.platform.TenantFeatureAccess;
 import com.restaurantos.modules.staff.repository.TenantAccessDao;
+import com.restaurantos.modules.orders.repository.OrderQueryDao;
 import io.jsonwebtoken.Claims;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,7 +36,7 @@ class RealtimeChannelInterceptorTest {
         admins = mock(PlatformAdminAccessDao.class);
         access = mock(TenantAccessDao.class);
         features = mock(TenantFeatureAccess.class);
-        interceptor = new RealtimeChannelInterceptor(jwt, auth, admins, access, features);
+        interceptor = new RealtimeChannelInterceptor(jwt, auth, admins, access, features, mock(OrderQueryDao.class));
     }
 
     private org.springframework.messaging.Message<byte[]> message(StompHeaderAccessor headers) {
