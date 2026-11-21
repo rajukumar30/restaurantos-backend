@@ -4,6 +4,8 @@ import com.restaurantos.modules.orders.repository.OrderQueryDao;
 import com.restaurantos.modules.orders.service.OrderQueryService;
 import com.restaurantos.modules.staff.TenantAccessService;
 import com.restaurantos.modules.platform.TenantFeatureAccess;
+import com.restaurantos.modules.realtime.dto.RealtimeEvent;
+import com.restaurantos.modules.realtime.service.RealtimeEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -15,7 +17,8 @@ public class OrderQueryServiceImpl implements OrderQueryService {
  private final OrderQueryDao dao;
  private final TenantAccessService access;
  private final TenantFeatureAccess featureAccess;
- public OrderQueryServiceImpl(OrderQueryDao dao,TenantAccessService access,TenantFeatureAccess featureAccess){this.dao=dao;this.access=access;this.featureAccess=featureAccess;}
+ private final RealtimeEventPublisher events;
+ public OrderQueryServiceImpl(OrderQueryDao dao,TenantAccessService access,TenantFeatureAccess featureAccess,RealtimeEventPublisher events){this.dao=dao;this.access=access;this.featureAccess=featureAccess;this.events=events;}
  @Transactional(readOnly=true)
  public PublicOrderStatus publicStatus(String qrToken,UUID orderId){
   List<PublicOrderStatus> results=dao.publicStatus(qrToken,orderId);
@@ -43,6 +46,7 @@ public class OrderQueryServiceImpl implements OrderQueryService {
    UUID actorId=(UUID)auth.getPrincipal();
    dao.recordServed(tenantId,request.branchId(),orderId,actorId);
   }
+  events.publishAfterCommit(RealtimeEvent.orderChanged("ORDER_STATUS_CHANGED",tenantId,request.branchId(),orderId));
   return new OrderStatusUpdated(orderId,status);
  }
 }
