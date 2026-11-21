@@ -47,6 +47,8 @@ public class RealtimeEventPublisherImpl implements RealtimeEventPublisher {
                         messaging.convertAndSend("/topic/guest/tables/" + event.payload().get("tableId") + "/service-requests", event);
                     }
                     if ("orders".equals(topic)) {
+                        messaging.convertAndSend("/topic/tenants/" + event.tenantId()
+                                + "/branches/" + event.branchId() + "/billing", event);
                         messaging.convertAndSend("/topic/guest/orders/" + event.resourceId(), event);
                     }
                 } catch (RuntimeException ex) {
