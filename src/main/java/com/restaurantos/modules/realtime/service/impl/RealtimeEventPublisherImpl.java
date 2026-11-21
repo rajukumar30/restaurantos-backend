@@ -28,6 +28,11 @@ public class RealtimeEventPublisherImpl implements RealtimeEventPublisher {
         publish(event, "service-requests");
     }
 
+    @Override
+    public void publishBillingAfterCommit(RealtimeEvent event) {
+        publish(event, "billing");
+    }
+
     private void publish(RealtimeEvent event, String topic) {
         if (!TransactionSynchronizationManager.isActualTransactionActive()
                 || !TransactionSynchronizationManager.isSynchronizationActive())
