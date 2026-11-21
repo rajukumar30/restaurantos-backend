@@ -36,6 +36,7 @@ class RealtimeChannelInterceptorTest {
         jwt = mock(JwtService.class);
         auth = mock(AuthDao.class);
         admins = mock(PlatformAdminAccessDao.class);
+        when(admins.active(user)).thenReturn(true);
         access = mock(TenantAccessDao.class);
         features = mock(TenantFeatureAccess.class);
         orders = mock(OrderQueryDao.class);
@@ -125,6 +126,18 @@ class RealtimeChannelInterceptorTest {
         StompHeaderAccessor headers = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
         headers.setUser(new UsernamePasswordAuthenticationToken(user, null, List.of()));
         headers.setSessionAttributes(new java.util.HashMap<>(java.util.Map.of("jwtExpiresAt", System.currentTimeMillis() - 1000L)));
+        headers.setDestination("/topic/tenants/" + tenant + "/branches/" + branch + "/orders");
+        when(access.activeBranchExists(tenant, branch)).thenReturn(true);
+        when(access.hasPermission(user, tenant, branch, "orders:read")).thenReturn(true);
+        when(features.enabled(tenant, "GUEST_ORDERING")).thenReturn(true);
+        assertThrows(SecurityException.class, () -> interceptor.preSend(message(headers), null));
+    }
+
+    @Test
+    void rejectsRevokedStaffAccountOnNewSubscription() {
+        when(admins.active(user)).thenReturn(false);
+        StompHeaderAccessor headers = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
+        headers.setUser(new UsernamePasswordAuthenticationToken(user, null, List.of()));
         headers.setDestination("/topic/tenants/" + tenant + "/branches/" + branch + "/orders");
         when(access.activeBranchExists(tenant, branch)).thenReturn(true);
         when(access.hasPermission(user, tenant, branch, "orders:read")).thenReturn(true);
