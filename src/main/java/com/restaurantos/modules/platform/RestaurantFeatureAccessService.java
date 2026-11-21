@@ -25,7 +25,8 @@ public class RestaurantFeatureAccessService {
     public void require(UUID tenantId, String featureKey) {
         if (!enforcementEnabled) return;
         Access a = dao.latestActive(tenantId, featureKey);
-        if (dao.activeGrant(tenantId, featureKey)) return;\n        if (a == null) {
+        if (dao.activeGrant(tenantId, featureKey)) return;
+        if (a == null) {
             if (!dao.hasAnySubscription(tenantId)) return;
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                 "No active subscription. Please contact restaurant support.");
