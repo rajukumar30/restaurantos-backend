@@ -21,10 +21,12 @@ public class PlatformPlanFeaturesServiceImpl implements PlatformPlanFeaturesServ
  public List<PlanFeature> update(UUID id,String key,Update request,Authentication auth){
   if(auth==null||!(auth.getPrincipal() instanceof UUID))
    throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"Authentication required");
-  if(key==null || !key.matches("[A-Z][A-Z0-9_]{0,63}"))\n   throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid feature key");\n  List<String> locked=dao.status(id,true);
+  if(key==null || !key.matches("[A-Z][A-Z0-9_]{0,63}"))
+   throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid feature key");
+  List<String> locked=dao.status(id,true);
   if(locked.isEmpty())throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Plan not found");
-  if(!"DRAFT".equals(locked.getFirst()))
-   throw new ResponseStatusException(HttpStatus.CONFLICT,"Only draft plan features can be edited");
+  if(!"DRAFT".equals(locked.getFirst()) && !("ARCHIVED".equals(locked.getFirst()) && !dao.hasSubscriptions(id)))
+   throw new ResponseStatusException(HttpStatus.CONFLICT,"Only draft or archived plans without subscription history can change features");
   if(request==null)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Feature selection required");
   List<PlanFeature> features=dao.load(id);
   PlanFeature selected=features.stream().filter(f->f.key().equals(key)).findFirst()
