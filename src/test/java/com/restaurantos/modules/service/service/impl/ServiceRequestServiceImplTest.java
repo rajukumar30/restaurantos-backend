@@ -3,6 +3,7 @@ import com.restaurantos.modules.service.dto.ServiceRequestDto.*;
 import com.restaurantos.modules.service.repository.ServiceRequestDao;
 import com.restaurantos.modules.staff.TenantAccessService;
 import com.restaurantos.modules.platform.TenantFeatureAccess;
+import com.restaurantos.modules.realtime.service.RealtimeEventPublisher;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.server.ResponseStatusException;
 import java.util.*;
@@ -12,7 +13,7 @@ class ServiceRequestServiceImplTest {
  private final ServiceRequestDao dao=mock(ServiceRequestDao.class);
  private final TenantAccessService access=mock(TenantAccessService.class);
  private final TenantFeatureAccess features=mock(TenantFeatureAccess.class);
- private final ServiceRequestServiceImpl service=new ServiceRequestServiceImpl(dao,access,features);
+ private final ServiceRequestServiceImpl service=new ServiceRequestServiceImpl(dao,access,features,mock(RealtimeEventPublisher.class));
  @Test void deniesGuestServiceRequestBeforeAnyWriteWhenFeatureIsDisabled(){
   UUID table=UUID.randomUUID(),tenant=UUID.randomUUID(),branch=UUID.randomUUID();
   when(dao.tables("qr")).thenReturn(List.of(new TableInfo(table,tenant,branch)));
