@@ -34,6 +34,10 @@ public class PlatformPlansController {
  public ApiResponse<SubscriptionPlan> activate(@PathVariable UUID id,Authentication authentication){
   requireAdmin(authentication);return ApiResponse.success("Plan activated",service.activate(id));
  }
+ @PostMapping("/{id}/reactivate")
+ public ApiResponse<SubscriptionPlan> reactivate(@PathVariable UUID id,Authentication authentication){
+  requireAdmin(authentication);return ApiResponse.success("Plan reactivated",service.reactivate(id));
+ }
  @PostMapping("/{id}/deactivate")
  public ApiResponse<SubscriptionPlan> deactivate(@PathVariable UUID id,Authentication authentication){
   requireAdmin(authentication);return ApiResponse.success("Plan deactivated",service.deactivate(id));
