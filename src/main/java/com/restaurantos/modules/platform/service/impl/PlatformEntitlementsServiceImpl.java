@@ -37,6 +37,21 @@ public class PlatformEntitlementsServiceImpl implements PlatformEntitlementsServ
    String reason=effective&&f.grantActive()&&!f.included()?"COMPLIMENTARY_GRANT":!assigned?"NO_SUBSCRIPTION":!active?"SUBSCRIPTION_INACTIVE":!f.available()?"PLATFORM_UNAVAILABLE":!f.included()?"NOT_IN_PLAN":!f.enabled()?"RESTAURANT_DISABLED":"ENABLED";
    return new Entitlement(f.key(),f.name(),f.category(),f.available(),f.included(),f.enabled(),effective,reason);
   }).toList();
-  return new Snapshot(tenantId,planId,planName,state,eligible,features);
+  Map<String,Entitlement> byKey=new HashMap<>();
+  for(Entitlement feature:features)byKey.put(feature.key(),feature);
+  Map<String,List<String>> dependencies=Map.of(
+   "GUEST_ORDERING",List.of("QR_MENU"),"KITCHEN_DISPLAY",List.of("GUEST_ORDERING"),
+   "WAITER_DASHBOARD",List.of("GUEST_ORDERING"),"ORDER_TRACKING",List.of("GUEST_ORDERING"),
+   "ORDER_HISTORY",List.of("GUEST_ORDERING"),"SERVICE_REQUESTS",List.of("QR_MENU"),
+   "DINE_IN",List.of("GUEST_ORDERING"),"TAKEAWAY",List.of("GUEST_ORDERING"));
+  List<Entitlement> resolved=features.stream().map(feature->{
+   if(!feature.effectiveEnabled())return feature;
+   boolean ready=dependencies.getOrDefault(feature.key(),List.of()).stream()
+    .allMatch(dep->dependencyEnabled(dep,byKey,dependencies,new HashSet<>()));
+   if(ready)return feature;
+   return new Entitlement(feature.key(),feature.name(),feature.category(),
+    feature.platformAvailable(),feature.planIncluded(),feature.restaurantEnabled(),false,"DEPENDENCY_DISABLED");
+  }).toList();
+  return new Snapshot(tenantId,planId,planName,state,eligible,resolved);
  }
 }
