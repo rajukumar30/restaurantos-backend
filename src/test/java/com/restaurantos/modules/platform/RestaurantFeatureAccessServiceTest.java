@@ -14,18 +14,26 @@ class RestaurantFeatureAccessServiceTest {
     private final RestaurantFeatureAccessDao dao=mock(RestaurantFeatureAccessDao.class);
     private final UUID tenant=UUID.randomUUID();
 
-    @Test void disabledEnforcementDoesNotHitDatabase() {
-        new RestaurantFeatureAccessService(dao,false,7,false).require(tenant,"GUEST_ORDERING");
-        verifyNoInteractions(dao);
+    @Test void disabledEnforcementCannotBypassPlanRequirement() {
+        assertThrows(ResponseStatusException.class,()->new RestaurantFeatureAccessService(dao,false,7,false).require(tenant,"GUEST_ORDERING"));
+        verify(dao).latestActive(tenant,"GUEST_ORDERING");
     }
-    @Test void grandfatheredTenantWithoutPlanIsAllowed() {
-        new RestaurantFeatureAccessService(dao,true,7,true).require(tenant,"GUEST_ORDERING");
-        verify(dao).hasAnySubscription(tenant);
+    @Test void grandfatheringCannotBypassPlanRequirement() {
+        assertThrows(ResponseStatusException.class,()->new RestaurantFeatureAccessService(dao,true,7,true).require(tenant,"GUEST_ORDERING"));
     }
     @Test void unassignedTenantDeniedByDefault() {
         var service=new RestaurantFeatureAccessService(dao,true,7,false);
         assertEquals(HttpStatus.FORBIDDEN,assertThrows(ResponseStatusException.class,
             ()->service.require(tenant,"QR_MENU")).getStatusCode());
+    }
+    @Test void complimentaryGrantCannotBypassMissingPlan(){
+        when(dao.activeGrant(tenant,"QR_MENU")).thenReturn(true);
+        assertThrows(ResponseStatusException.class,()->new RestaurantFeatureAccessService(dao,true,7,false).require(tenant,"QR_MENU"));
+    }
+    @Test void activePlanAllowsComplimentaryGrant(){
+        when(dao.latestActive(tenant,"QR_MENU")).thenReturn(new Access(
+            LocalDate.now().minusDays(1),LocalDate.now().plusDays(30),false,true,true,true));
+        assertDoesNotThrow(()->new RestaurantFeatureAccessService(dao,true,7,false).require(tenant,"QR_MENU"));
     }
     @Test void expiredSubscriptionIsRejectedAfterGracePeriod() {
         when(dao.latestActive(tenant,"GUEST_ORDERING")).thenReturn(new Access(
