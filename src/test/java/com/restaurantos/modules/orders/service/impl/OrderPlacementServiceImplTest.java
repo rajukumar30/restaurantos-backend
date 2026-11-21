@@ -2,7 +2,7 @@ package com.restaurantos.modules.orders.service.impl;
 import com.restaurantos.modules.orders.dto.OrderDto.*;
 import com.restaurantos.modules.orders.entity.*;
 import com.restaurantos.modules.orders.repository.OrderPlacementDao;
-import com.restaurantos.modules.platform.RestaurantFeatureAccessService;
+import com.restaurantos.modules.platform.TenantFeatureAccess;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 class OrderPlacementServiceImplTest {
  private final OrderPlacementDao dao=mock(OrderPlacementDao.class);
- private final RestaurantFeatureAccessService feature=mock(RestaurantFeatureAccessService.class);
+ private final TenantFeatureAccess feature=mock(TenantFeatureAccess.class);
  private final OrderPlacementServiceImpl service=new OrderPlacementServiceImpl(dao,feature);
  private final UUID tenant=UUID.randomUUID(),branch=UUID.randomUUID(),tableId=UUID.randomUUID(),item=UUID.randomUUID();
  private PlaceOrderRequest request(List<OrderLineRequest> items){
