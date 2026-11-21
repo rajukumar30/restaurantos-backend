@@ -42,6 +42,10 @@ public class PlatformPlansController {
  public ApiResponse<SubscriptionPlan> activate(@PathVariable UUID id,Authentication authentication){
   requireAdmin(authentication);return ApiResponse.success("Plan activated",service.activate(id));
  }
+ @PostMapping("/{id}/versions")
+ public ApiResponse<SubscriptionPlan> createVersion(@PathVariable UUID id,Authentication authentication){
+  requireAdmin(authentication);return ApiResponse.success("Editable draft copied from plan",service.createVersion(id));
+ }
  @PostMapping("/{id}/reactivate")
  public ApiResponse<SubscriptionPlan> reactivate(@PathVariable UUID id,Authentication authentication){
   requireAdmin(authentication);return ApiResponse.success("Plan reactivated",service.reactivate(id));
