@@ -104,6 +104,9 @@ public class RealtimeChannelInterceptor implements ChannelInterceptor {
             Object expiresAt = headers.getSessionAttributes() == null ? null : headers.getSessionAttributes().get("jwtExpiresAt");
             if (!(expiresAt instanceof Long expiry) || expiry <= System.currentTimeMillis())
                 throw new SecurityException("Session expired; reconnect required");
+            // Recheck account revocation for each new subscription, not only at CONNECT.
+            if (!admins.active(userId) && auth.activeMemberships(userId).isEmpty())
+                throw new SecurityException("Account access revoked");
             Matcher match = ORDER_TOPIC.matcher(destination == null ? "" : destination);
             if (!match.matches()) throw new SecurityException("Subscription not allowed");
             UUID tenantId = UUID.fromString(match.group(1));
