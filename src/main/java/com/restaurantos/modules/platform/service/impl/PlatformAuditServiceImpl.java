@@ -12,6 +12,7 @@ import java.util.UUID;
 
 import com.restaurantos.modules.platform.dto.PlatformAuditDto.*;
 import com.restaurantos.modules.platform.service.PlatformAuditService;
+import com.restaurantos.modules.platform.PlatformAuditDao;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 @Service
