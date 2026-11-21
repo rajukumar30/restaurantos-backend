@@ -1,5 +1,7 @@
 package com.restaurantos.modules.staff.service.impl;
 import com.restaurantos.modules.staff.TenantAccessService;
+import com.restaurantos.modules.realtime.dto.RealtimeEvent;
+import com.restaurantos.modules.realtime.service.RealtimeEventPublisher;
 import com.restaurantos.modules.staff.dto.StaffBillingDto.PaymentRequest;
 import com.restaurantos.modules.staff.repository.StaffBillingDao;
 import com.restaurantos.modules.staff.service.StaffBillingService;
@@ -12,9 +14,10 @@ import java.math.BigDecimal;
 import java.util.*;
 @Service
 public class StaffBillingServiceImpl implements StaffBillingService {
+ private final RealtimeEventPublisher events;
  private final StaffBillingDao dao;
  private final TenantAccessService access;
- public StaffBillingServiceImpl(StaffBillingDao dao,TenantAccessService access){this.dao=dao;this.access=access;}
+ public StaffBillingServiceImpl(StaffBillingDao dao,TenantAccessService access,RealtimeEventPublisher events){this.dao=dao;this.access=access;this.events=events;}
  private UUID requireCashier(Authentication auth,UUID tenantId,UUID branchId){
   UUID userId=access.requirePermission(auth,tenantId,branchId,"payments:read");
   access.requireBranchInTenant(tenantId,branchId);
@@ -43,6 +46,7 @@ public class StaffBillingServiceImpl implements StaffBillingService {
   String reference=request.reference()==null||request.reference().isBlank()?null:request.reference().trim();
   UUID paymentId=UUID.randomUUID();
   dao.insertPayment(paymentId,tenantId,request.branchId(),orderId,request.amount(),method,reference,userId);
+  events.publishBillingAfterCommit(RealtimeEvent.orderChanged("PAYMENT_RECORDED",tenantId,request.branchId(),orderId));
   return Map.of("paymentId",paymentId,"remainingBalance",balance.subtract(request.amount()),"method",method);
  }
 }
