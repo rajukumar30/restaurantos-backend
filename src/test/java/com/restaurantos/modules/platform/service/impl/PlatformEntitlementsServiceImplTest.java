@@ -67,7 +67,7 @@ class PlatformEntitlementsServiceImplTest {
    new FeatureFlags("QR_MENU","QR Menu","GUEST",true,false,false,true)));
   var feature=service.snapshot(tenant).features().getFirst();
   assertFalse(feature.effectiveEnabled());
-  assertEquals("RESTAURANT_DISABLED",feature.reason());
+  assertEquals("NO_SUBSCRIPTION",feature.reason());
  }
  @Test void disabledPrerequisiteDisablesDependentFeature(){
   when(dao.tenantExists(tenant)).thenReturn(true);
