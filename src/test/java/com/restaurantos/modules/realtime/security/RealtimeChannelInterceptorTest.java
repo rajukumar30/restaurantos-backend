@@ -25,6 +25,7 @@ class RealtimeChannelInterceptorTest {
     private TenantAccessDao access;
     private TenantFeatureAccess features;
     private RealtimeChannelInterceptor interceptor;
+    private OrderQueryDao orders;
     private final UUID user = UUID.randomUUID();
     private final UUID tenant = UUID.randomUUID();
     private final UUID branch = UUID.randomUUID();
@@ -36,7 +37,8 @@ class RealtimeChannelInterceptorTest {
         admins = mock(PlatformAdminAccessDao.class);
         access = mock(TenantAccessDao.class);
         features = mock(TenantFeatureAccess.class);
-        interceptor = new RealtimeChannelInterceptor(jwt, auth, admins, access, features, mock(OrderQueryDao.class));
+        orders = mock(OrderQueryDao.class);
+        interceptor = new RealtimeChannelInterceptor(jwt, auth, admins, access, features, orders);
     }
 
     private org.springframework.messaging.Message<byte[]> message(StompHeaderAccessor headers) {
@@ -126,6 +128,29 @@ class RealtimeChannelInterceptorTest {
         when(access.activeBranchExists(tenant, branch)).thenReturn(true);
         when(access.hasPermission(user, tenant, branch, "orders:read")).thenReturn(true);
         when(features.enabled(tenant, "GUEST_ORDERING")).thenReturn(true);
+        assertThrows(SecurityException.class, () -> interceptor.preSend(message(headers), null));
+    }
+
+    @Test
+    void rejectsGuestSubscriptionWithoutQrProof() {
+        StompHeaderAccessor headers = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
+        headers.setDestination("/topic/guest/orders/" + UUID.randomUUID());
+        assertThrows(SecurityException.class, () -> interceptor.preSend(message(headers), null));
+    }
+
+    @Test
+    void rejectsGuestSubscriptionToOrderNotOnQrTable() {
+        UUID order = UUID.randomUUID();
+        StompHeaderAccessor headers = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
+        headers.setSessionAttributes(new java.util.HashMap<>(java.util.Map.of("guestQr", "other-table-qr")));
+        headers.setDestination("/topic/guest/orders/" + order);
+        assertThrows(SecurityException.class, () -> interceptor.preSend(message(headers), null));
+        verify(orders).publicStatus("other-table-qr", order);
+    }
+
+    @Test
+    void rejectsGuestConnectionWithoutCredentials() {
+        StompHeaderAccessor headers = StompHeaderAccessor.create(StompCommand.CONNECT);
         assertThrows(SecurityException.class, () -> interceptor.preSend(message(headers), null));
     }
 
