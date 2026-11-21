@@ -3,7 +3,7 @@ import com.restaurantos.modules.orders.dto.OrderDto.*;
 import com.restaurantos.modules.orders.entity.*;
 import com.restaurantos.modules.orders.repository.OrderPlacementDao;
 import com.restaurantos.modules.orders.service.OrderPlacementService;
-import com.restaurantos.modules.platform.RestaurantFeatureAccessService;
+import com.restaurantos.modules.platform.TenantFeatureAccess;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,8 +13,8 @@ import java.util.*;
 @Service
 public class OrderPlacementServiceImpl implements OrderPlacementService {
  private final OrderPlacementDao dao;
- private final RestaurantFeatureAccessService featureAccess;
- public OrderPlacementServiceImpl(OrderPlacementDao dao,RestaurantFeatureAccessService featureAccess){
+ private final TenantFeatureAccess featureAccess;
+ public OrderPlacementServiceImpl(OrderPlacementDao dao,TenantFeatureAccess featureAccess){
   this.dao=dao;this.featureAccess=featureAccess;
  }
  @Override
