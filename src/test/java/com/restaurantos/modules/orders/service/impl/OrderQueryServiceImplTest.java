@@ -3,6 +3,7 @@ import com.restaurantos.modules.orders.dto.OrderDto.*;
 import com.restaurantos.modules.orders.repository.OrderQueryDao;
 import com.restaurantos.modules.staff.TenantAccessService;
 import com.restaurantos.modules.platform.TenantFeatureAccess;
+import com.restaurantos.modules.realtime.service.RealtimeEventPublisher;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.server.ResponseStatusException;
@@ -14,7 +15,7 @@ class OrderQueryServiceImplTest {
  private final TenantAccessService access=mock(TenantAccessService.class);
  private final Authentication auth=mock(Authentication.class);
  private final TenantFeatureAccess features=mock(TenantFeatureAccess.class);
- private final OrderQueryServiceImpl service=new OrderQueryServiceImpl(dao,access,features);
+ private final OrderQueryServiceImpl service=new OrderQueryServiceImpl(dao,access,features,mock(RealtimeEventPublisher.class));
  @Test void rejectsUnknownPublicOrder(){
   UUID id=UUID.randomUUID();
   when(dao.publicStatus("token",id)).thenReturn(List.of());
