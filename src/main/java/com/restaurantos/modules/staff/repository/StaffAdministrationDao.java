@@ -22,11 +22,11 @@ public class StaffAdministrationDao {
               AND bu.status='ACTIVE'
             LEFT JOIN branches b ON b.id=bu.branch_id AND b.tenant_id=bu.tenant_id
             WHERE tu.tenant_id=?
-              AND (? IS NULL OR EXISTS (
+              AND (CAST(? AS UUID) IS NULL OR EXISTS (
                 SELECT 1 FROM branch_users filter_bu
                 WHERE filter_bu.tenant_id=tu.tenant_id AND filter_bu.tenant_user_id=tu.id
                   AND filter_bu.branch_id=? AND filter_bu.status='ACTIVE'))
-              AND (?=TRUE OR ur.branch_id IS NULL OR ur.branch_id=?)
+              AND (CAST(? AS BOOLEAN)=TRUE OR ur.branch_id IS NULL OR ur.branch_id=?)
             GROUP BY u.id,u.name,u.email,u.phone,u.status
             ORDER BY u.name
             """, (rs,i) -> new StaffMember(rs.getObject("id",UUID.class), rs.getString("name"),
