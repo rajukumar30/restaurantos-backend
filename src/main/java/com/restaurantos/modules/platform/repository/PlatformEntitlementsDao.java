@@ -28,7 +28,7 @@ public class PlatformEntitlementsDao {
    ORDER BY f.category,f.display_name
    """,(rs,i)->new FeatureFlags(rs.getString("feature_key"),rs.getString("display_name"),
     rs.getString("category"),rs.getBoolean("available"),rs.getBoolean("plan_included"),
-    rs.getBoolean("restaurant_enabled")),planId,tenantId);
+    rs.getBoolean("restaurant_enabled"),rs.getBoolean("complimentary_grant")),planId,tenantId,tenantId);
  }
- public record FeatureFlags(String key,String name,String category,boolean available,boolean included,boolean enabled){}
+ public record FeatureFlags(String key,String name,String category,boolean available,boolean included,boolean enabled,boolean grantActive){}
 }
