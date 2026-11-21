@@ -22,5 +22,11 @@ public class SubscriptionPlanDao {
  public int updateArchivedUnused(UUID id,String name,String description,long monthly,long annual){
   return jdbc.update("UPDATE platform_subscription_plans SET name=?,description=?,monthly_price_paise=?,annual_price_paise=?,updated_at=NOW() WHERE id=? AND status='ARCHIVED' AND NOT EXISTS(SELECT 1 FROM platform_restaurant_subscriptions WHERE plan_id=?)",name,description,monthly,annual,id,id);
  }
+ public SubscriptionPlan lockById(UUID id){return jdbc.query(SELECT+" WHERE id=? FOR UPDATE",this::map,id).stream().findFirst().orElse(null);}
+ public void copyFeatures(UUID source,UUID target){jdbc.update("""
+  INSERT INTO platform_plan_features(plan_id,feature_key,enabled)
+  SELECT ?,feature_key,enabled FROM platform_plan_features WHERE plan_id=?
+  ON CONFLICT(plan_id,feature_key) DO NOTHING
+  """,target,source);}
  public int archive(UUID id){return jdbc.update("UPDATE platform_subscription_plans SET status='ARCHIVED',updated_at=NOW() WHERE id=? AND status IN ('DRAFT','ACTIVE')",id);}
 }
