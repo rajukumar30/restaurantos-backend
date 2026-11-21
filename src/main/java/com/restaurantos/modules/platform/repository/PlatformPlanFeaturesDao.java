@@ -26,6 +26,7 @@ public class PlatformPlanFeaturesDao {
    rs.getString("category"),rs.getBoolean("available"),rs.getBoolean("included"),
    DEPENDENCIES.getOrDefault(rs.getString("feature_key"),List.of())),id);
  }
+ public boolean hasSubscriptions(UUID id){return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM platform_restaurant_subscriptions WHERE plan_id=?)",Boolean.class,id));}
  public void set(UUID id,String key,boolean included){
   jdbc.update("""
    INSERT INTO platform_plan_features(plan_id,feature_key,enabled)
