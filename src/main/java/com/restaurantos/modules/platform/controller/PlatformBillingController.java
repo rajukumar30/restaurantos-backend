@@ -35,6 +35,18 @@ public class PlatformBillingController {
             dao.createPending(request.tenantId(), request.subscriptionId(), request.amountPaise(), request.idempotencyKey()));
     }
 
+    @GetMapping("/payments/by-key")
+    public Map<String, Object> paymentByKey(@RequestParam String idempotencyKey) {
+        if (idempotencyKey == null || !idempotencyKey.matches("[A-Za-z0-9_-]{12,100}")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid idempotency key");
+        }
+        Map<String, Object> payment = dao.findByIdempotencyKey(idempotencyKey);
+        if (payment == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Payment attempt not found");
+        }
+        return Map.of("success", true, "data", payment);
+    }
+
     // SecurityConfig restricts /api/v1/platform/** to PLATFORM_ADMIN.
     @GetMapping("/payments")
     public Map<String, Object> payments(@RequestParam(required = false) UUID tenantId) {
