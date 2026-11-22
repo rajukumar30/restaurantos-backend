@@ -23,8 +23,17 @@ class OrderQueryServiceImplTest {
  }
  @Test void rejectsUnsupportedTransitionBeforeWrite(){
   UUID tenant=UUID.randomUUID(),branch=UUID.randomUUID(),order=UUID.randomUUID();
-  assertThrows(ResponseStatusException.class,()->service.updateStatus(tenant,order,new UpdateOrderStatusRequest(branch,"READY"),auth));
+  assertThrows(ResponseStatusException.class,()->service.updateStatus(tenant,order,new UpdateOrderStatusRequest(branch,"INVALID"),auth));
   verify(dao,never()).updateStatus(any(),any(),any(),any());
+ }
+ @Test void allowsKitchenTransitions(){
+  UUID tenant=UUID.randomUUID(),branch=UUID.randomUUID(),order=UUID.randomUUID();
+  for(String status:List.of("ACCEPTED","PREPARING","READY")){
+   when(dao.updateStatus(tenant,branch,order,status)).thenReturn(1);
+   assertEquals(status,service.updateStatus(tenant,order,new UpdateOrderStatusRequest(branch,status),auth).status());
+   verify(dao).updateStatus(tenant,branch,order,status);
+  }
+  verify(dao,never()).recordServed(any(),any(),any(),any());
  }
  @Test void rejectsStaleTransition(){
   UUID tenant=UUID.randomUUID(),branch=UUID.randomUUID(),order=UUID.randomUUID();
