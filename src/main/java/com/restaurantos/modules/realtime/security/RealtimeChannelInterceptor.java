@@ -49,6 +49,29 @@ public class RealtimeChannelInterceptor implements ChannelInterceptor {
         this.features = features;
     }
 
+    /**
+     * Revalidate every broker delivery for an existing subscription. Returning null drops
+     * the message if a JWT expired, an account was revoked or permissions changed.
+     * This does not close the socket; it prevents further delivery of protected events.
+     */
+    public Message<?> authorizeOutbound(Message<?> message) {
+        StompHeaderAccessor outbound = StompHeaderAccessor.wrap(message);
+        if (outbound.getCommand() != StompCommand.MESSAGE || outbound.getSubscriptionId() == null)
+            return message;
+        StompHeaderAccessor check = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
+        check.setDestination(outbound.getDestination());
+        check.setUser(outbound.getUser());
+        check.setSessionAttributes(outbound.getSessionAttributes());
+        check.setLeaveMutable(true);
+        try {
+            preSend(org.springframework.messaging.support.MessageBuilder.createMessage(
+                    new byte[0], check.getMessageHeaders()), null);
+            return message;
+        } catch (SecurityException ex) {
+            return null;
+        }
+    }
+
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
         StompHeaderAccessor headers = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
