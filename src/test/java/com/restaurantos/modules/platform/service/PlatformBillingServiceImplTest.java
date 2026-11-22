@@ -49,6 +49,7 @@ class PlatformBillingServiceImplTest {
 
     @Test
     void rejectsUnknownPaymentKey() {
+        when(dao.findByIdempotencyKey("valid-key-123456")).thenReturn(null);
         var error = assertThrows(ResponseStatusException.class, () -> service.paymentByKey("valid-key-123456"));
         assertEquals(HttpStatus.NOT_FOUND, error.getStatusCode());
     }
