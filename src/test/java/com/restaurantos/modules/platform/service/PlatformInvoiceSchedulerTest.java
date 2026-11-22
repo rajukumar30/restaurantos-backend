@@ -22,7 +22,7 @@ class PlatformInvoiceSchedulerTest {
         LocalDate today=LocalDate.now(ZoneOffset.UTC);
         UUID id=UUID.randomUUID();
         when(dao.dueCandidates(today)).thenReturn(List.of(Map.of(
-            "id",id,"startsOn",today.minusMonths(1),"billingCycle","MONTHLY")));
+            "id",id,"startsOn",today,"billingCycle","MONTHLY")));
         new PlatformInvoiceScheduler(dao,service,true).runDaily();
         verify(service).issue(id,today);
     }
