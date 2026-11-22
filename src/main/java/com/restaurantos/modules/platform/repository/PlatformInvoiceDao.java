@@ -25,6 +25,21 @@ public class PlatformInvoiceDao {
             """, tenantId == null ? null : tenantId.toString(),tenantId == null ? null : tenantId.toString());
     }
 
+    public List<Map<String,Object>> dueCandidates(LocalDate today) {
+        return jdbc.queryForList("""
+            SELECT s.id, s.starts_on AS "startsOn", s.billing_cycle AS "billingCycle"
+            FROM platform_restaurant_subscriptions s
+            JOIN platform_subscription_plans p ON p.id=s.plan_id
+            WHERE s.status='ACTIVE' AND s.starts_on<=?
+              AND (s.ends_on IS NULL OR s.ends_on>=?)
+              AND COALESCE(s.custom_price_paise,
+                  CASE WHEN s.billing_cycle='MONTHLY' THEN p.monthly_price_paise
+                       ELSE p.annual_price_paise END)>0
+            ORDER BY s.id
+            LIMIT 1001
+            """,today,today);
+    }
+
     public Map<String,Object> create(UUID subscriptionId, LocalDate periodStart) {
         // Server-side pricing; caller cannot set the invoice amount or mark it paid.
         // Lock subscription to serialize invoice creation against subscription changes.
