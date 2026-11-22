@@ -28,11 +28,12 @@ class RestaurantOnboardingServiceImplTest {
             isNull(), eq("bcrypt-hash"));
         verify(dao).grantAllPermissions(any());
     }
-    @Test void rejectsDuplicateSlugBeforeDatabaseMutation() {
+    @Test void allowsDuplicateDisplayNamesWithDistinctUrls() {
         when(dao.slugExists("sample")).thenReturn(true);
-        assertEquals(HttpStatus.CONFLICT, assertThrows(ResponseStatusException.class,
-            () -> service.create(request("Sample"))).getStatusCode());
-        verify(dao, never()).insertTenant(any(), any(), any(), any());
+        RestaurantCreated created = service.create(request("Sample"));
+        assertTrue(created.slug().matches("sample-[a-f0-9]{8}"));
+        assertEquals(created.slug(),created.subdomain());
+        verify(dao).insertTenant(eq(created.tenantId()),eq("Sample"),eq(created.slug()),eq(created.subdomain()));
     }
     @Test void rejectsInvalidSlug() {
         assertEquals(HttpStatus.BAD_REQUEST, assertThrows(ResponseStatusException.class,
