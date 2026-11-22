@@ -27,6 +27,16 @@ class PlatformInvoiceSchedulerTest {
         verify(service).issue(id,today);
     }
 
+    @Test void upcomingRenewalIsInvoicedSevenDaysEarly() {
+        LocalDate today=LocalDate.now(ZoneOffset.UTC);
+        LocalDate renewal=today.plusDays(7);
+        UUID id=UUID.randomUUID();
+        when(dao.dueCandidates(today)).thenReturn(List.of(Map.of(
+            "id",id,"startsOn",renewal.minusMonths(1),"billingCycle","MONTHLY")));
+        new PlatformInvoiceScheduler(dao,service,true).runDaily();
+        verify(service).issue(id,renewal);
+    }
+
     @Test void noInvoiceOutsideBillingAnniversary() {
         LocalDate today=LocalDate.now(ZoneOffset.UTC);
         UUID id=UUID.randomUUID();
