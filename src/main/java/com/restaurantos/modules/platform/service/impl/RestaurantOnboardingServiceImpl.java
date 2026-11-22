@@ -25,12 +25,11 @@ public class RestaurantOnboardingServiceImpl implements RestaurantOnboardingServ
     @Override
     @Transactional
     public RestaurantCreated create(CreateRestaurantRequest req) {
-        String slug = slugify(req.restaurantName());
+        String baseSlug = slugify(req.restaurantName());
+        String slug = baseSlug;
         if (slug.length() > 63) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
             "Restaurant name produces a URL slug longer than 63 characters; use a shorter name.");
-        if (dao.slugExists(slug)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "A restaurant with this name already exists; choose a unique name.");
-        }
+        if (dao.slugExists(slug)) slug = uniqueSlug(baseSlug);
         String subdomain = availableSubdomain(slug);
         if (dao.emailExists(req.ownerEmail().trim())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "An account with this owner email already exists.");
@@ -64,11 +63,17 @@ public class RestaurantOnboardingServiceImpl implements RestaurantOnboardingServ
         return slug;
     }
 
+    private String uniqueSlug(String base) {
+        String candidate;
+        do { candidate = suffix(base); } while (dao.slugExists(candidate));
+        return candidate;
+    }
+
     private String availableSubdomain(String slug) {
         String candidate = slug;
         if (candidate.length() > 63) candidate = suffix(candidate);
         if (RESERVED.contains(candidate)) candidate = "restaurant-" + candidate;
-        if (dao.subdomainExists(candidate)) candidate = suffix(candidate);
+        while (dao.subdomainExists(candidate)) candidate = suffix(slug);
         return candidate;
     }
     private String suffix(String candidate) {
