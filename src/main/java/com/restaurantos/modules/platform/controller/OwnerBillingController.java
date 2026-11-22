@@ -2,6 +2,7 @@ package com.restaurantos.modules.platform.controller;
 
 import com.restaurantos.modules.auth.repository.AuthDao;
 import com.restaurantos.modules.platform.repository.PlatformInvoiceDao;
+import com.restaurantos.modules.platform.repository.PlatformInvoiceReminderDao;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -20,9 +21,10 @@ import java.util.UUID;
 public class OwnerBillingController {
     private final AuthDao auth;
     private final PlatformInvoiceDao invoices;
+    private final PlatformInvoiceReminderDao reminders;
 
-    public OwnerBillingController(AuthDao auth, PlatformInvoiceDao invoices) {
-        this.auth=auth;this.invoices=invoices;
+    public OwnerBillingController(AuthDao auth, PlatformInvoiceDao invoices, PlatformInvoiceReminderDao reminders) {
+        this.auth=auth;this.invoices=invoices;this.reminders=reminders;
     }
 
     @GetMapping
@@ -46,6 +48,7 @@ public class OwnerBillingController {
             .count();
         return Map.of("success",true,"data",Map.of(
             "invoices",rows,"unpaidPaise",unpaid,"overduePaise",overdue,
-            "dueSoonCount",dueSoon,"asOf",today.toString()));
+            "dueSoonCount",dueSoon,"asOf",today.toString(),
+            "reminders",reminders.forTenant(tenantId)));
     }
 }
