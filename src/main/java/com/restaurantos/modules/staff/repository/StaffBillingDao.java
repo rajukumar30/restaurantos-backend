@@ -20,7 +20,7 @@ public class StaffBillingDao {
  }
  public List<Map<String,Object>> bills(UUID tenantId,UUID branchId){
   return jdbc.queryForList("""
-   SELECT o.id,o.order_number AS "orderNumber",rt.display_name AS "tableName",
+   SELECT o.id,o.table_visit_id AS "visitId",o.order_number AS "orderNumber",rt.display_name AS "tableName",
    o.status,o.total_amount AS "totalAmount",
    COALESCE((SELECT SUM(p.amount) FROM restaurant_order_payments p
     WHERE p.tenant_id=o.tenant_id AND p.branch_id=o.branch_id AND p.order_id=o.id),0) AS "paidAmount",
