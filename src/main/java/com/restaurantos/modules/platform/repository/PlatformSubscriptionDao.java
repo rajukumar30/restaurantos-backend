@@ -52,7 +52,7 @@ public class PlatformSubscriptionDao {
         return jdbc.queryForObject(SELECT + " WHERE s.id = ?", this::map, id);
     }
     public boolean isActivePlan(UUID id) {
-        return jdbc.query("SELECT status FROM platform_subscription_plans WHERE id = ?",
+        return jdbc.query("SELECT status FROM platform_subscription_plans WHERE id = ? FOR SHARE",
             (rs, i) -> rs.getString(1), id).stream().anyMatch("ACTIVE"::equals);
     }
     public boolean tenantExists(UUID tenantId) {
