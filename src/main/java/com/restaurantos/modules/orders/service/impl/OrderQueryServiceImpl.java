@@ -32,6 +32,15 @@ public class OrderQueryServiceImpl implements OrderQueryService {
   featureAccess.require(tenantId,"GUEST_ORDERING");
   return dao.list(tenantId,branchId);
  }
+ @Transactional(readOnly=true)
+ public OrderSummary get(UUID tenantId,UUID branchId,UUID orderId,Authentication auth){
+  access.requirePermission(auth,tenantId,branchId,"orders:read");
+  access.requireBranchInTenant(tenantId,branchId);
+  featureAccess.require(tenantId,"GUEST_ORDERING");
+  var result=dao.findById(tenantId,branchId,orderId);
+  if(result.isEmpty())throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Order not found in this branch.");
+  return result.getFirst();
+ }
  @Transactional
  public OrderStatusUpdated updateStatus(UUID tenantId,UUID orderId,UpdateOrderStatusRequest request,Authentication auth){
   access.requirePermission(auth,tenantId,request.branchId(),"orders:manage");
