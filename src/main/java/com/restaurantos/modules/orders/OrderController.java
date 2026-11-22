@@ -23,8 +23,10 @@ public class OrderController {
 
     @PostMapping("/api/v1/public/qr/{qrToken}/orders")
     public ApiResponse<OrderReceipt> placeQrOrder(@PathVariable String qrToken,
-            @Valid @RequestBody PlaceOrderRequest request,Authentication authentication){
-        return ApiResponse.success("Order placed successfully",orderPlacement.place(qrToken,request));
+            @Valid @RequestBody PlaceOrderRequest request,
+            @RequestHeader(value="Idempotency-Key",required=false) String idempotencyKey,
+            Authentication authentication){
+        return ApiResponse.success("Order placed successfully",orderPlacement.place(qrToken,request,idempotencyKey));
     }
 
     @GetMapping("/api/v1/public/qr/{qrToken}/orders/{orderId}")
