@@ -25,11 +25,13 @@ public class RestaurantOnboardingServiceImpl implements RestaurantOnboardingServ
     @Transactional
     public RestaurantCreated create(CreateRestaurantRequest req) {
         String slug = slugify(req.restaurantName());
+        if (slug.length() > 63) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            "Restaurant name produces a URL slug longer than 63 characters; use a shorter name.");
         if (dao.slugExists(slug)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "A restaurant with this name already exists; choose a unique name.");
         }
         String subdomain = availableSubdomain(slug);
-        if (dao.emailExists(req.ownerEmail())) {
+        if (dao.emailExists(req.ownerEmail().trim())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "An account with this owner email already exists.");
         }
         UUID tenantId = UUID.randomUUID(), branchId = UUID.randomUUID(),
@@ -38,7 +40,7 @@ public class RestaurantOnboardingServiceImpl implements RestaurantOnboardingServ
         String address = req.addressJson() == null || req.addressJson().isBlank() ? "{}" : req.addressJson();
         dao.insertTenant(tenantId, req.restaurantName().trim(), slug, subdomain);
         dao.insertBranch(branchId, tenantId, req.branchName().trim(), address, req.branchPhone());
-        dao.insertOwner(userId, req.ownerName().trim(), req.ownerEmail().toLowerCase(Locale.ROOT),
+        dao.insertOwner(userId, req.ownerName().trim(), req.ownerEmail().trim().toLowerCase(Locale.ROOT),
             req.ownerPhone(), encoder.encode(req.ownerPassword()));
         dao.insertTenantMember(tenantUserId, tenantId, userId);
         dao.insertBranchMember(branchUserId, tenantId, branchId, tenantUserId);
