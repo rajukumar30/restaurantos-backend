@@ -48,13 +48,21 @@ public class OrderPlacementDao {
    VALUES(?,?,?,?,?,'OPEN')
    """,visitId,table.tenantId(),table.branchId(),table.tableId(),billNumber);
  }
+ public List<Map<String,Object>> findSubmission(QrTable table,String key){
+  return jdbc.queryForList("""
+   SELECT id AS "orderId",order_number AS "orderNumber",total_amount AS "totalAmount",
+          status,request_hash AS "requestHash"
+   FROM restaurant_orders
+   WHERE tenant_id=? AND table_id=? AND idempotency_key=?
+   """,table.tenantId(),table.tableId(),key);
+ }
  public void createOrder(UUID orderId,String orderNumber,QrTable table,UUID visitId,
-                         String name,String phone,String notes,BigDecimal total){
+                         String name,String phone,String notes,BigDecimal total,String key,String requestHash){
   jdbc.update("""
    INSERT INTO restaurant_orders
-    (id,tenant_id,branch_id,table_id,order_number,customer_name,notes,total_amount,customer_phone,table_visit_id)
-   VALUES(?,?,?,?,?,?,?,?,?,?)
-   """,orderId,table.tenantId(),table.branchId(),table.tableId(),orderNumber,name,notes,total,phone,visitId);
+    (id,tenant_id,branch_id,table_id,order_number,customer_name,notes,total_amount,customer_phone,table_visit_id,idempotency_key,request_hash)
+   VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
+   """,orderId,table.tenantId(),table.branchId(),table.tableId(),orderNumber,name,notes,total,phone,visitId,key,requestHash);
  }
  public void createOrderItem(UUID tenantId,UUID orderId,ValidatedOrderLine line){
   jdbc.update("""
