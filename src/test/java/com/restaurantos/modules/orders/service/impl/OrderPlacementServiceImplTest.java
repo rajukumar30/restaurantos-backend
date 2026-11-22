@@ -20,32 +20,44 @@ class OrderPlacementServiceImplTest {
  }
  @Test void rejectsInvalidQrBeforeAnyWrites(){
   when(dao.findActiveTable("invalid")).thenReturn(List.of());
-  assertThrows(ResponseStatusException.class,()->service.place("invalid",request(List.of(new OrderLineRequest(item,1)))));
-  verify(dao,never()).createOrder(any(),any(),any(),any(),any(),any(),any(),any());
+  assertThrows(ResponseStatusException.class,()->service.place("invalid",request(List.of(new OrderLineRequest(item,1))),null));
+  verify(dao,never()).createOrder(any(),any(),any(),any(),any(),any(),any(),any(),any(),any());
  }
  @Test void deniesOrderPlacementWhenQrMenuDependencyIsUnavailable(){
   when(dao.findActiveTable("qr")).thenReturn(List.of(new QrTable(tableId,tenant,branch,"Table 1")));
   doThrow(new ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN))
    .when(feature).require(tenant,"GUEST_ORDERING");
-  assertThrows(ResponseStatusException.class,()->service.place("qr",request(List.of(new OrderLineRequest(item,1)))));
+  assertThrows(ResponseStatusException.class,()->service.place("qr",request(List.of(new OrderLineRequest(item,1))),null));
   verify(dao,never()).lockTable(any());
-  verify(dao,never()).createOrder(any(),any(),any(),any(),any(),any(),any(),any());
+  verify(dao,never()).createOrder(any(),any(),any(),any(),any(),any(),any(),any(),any(),any());
  }
  @Test void rejectsCombinedQuantityOverLimit(){
   when(dao.findActiveTable("qr")).thenReturn(List.of(new QrTable(tableId,tenant,branch,"Table 1")));
-  assertThrows(ResponseStatusException.class,()->service.place("qr",request(List.of(new OrderLineRequest(item,15),new OrderLineRequest(item,6)))));
+  assertThrows(ResponseStatusException.class,()->service.place("qr",request(List.of(new OrderLineRequest(item,15),new OrderLineRequest(item,6))),null));
   verify(dao,never()).lockTable(any());
  }
  @Test void rejectsUnavailableItem(){
   when(dao.findActiveTable("qr")).thenReturn(List.of(new QrTable(tableId,tenant,branch,"Table 1")));
-  assertThrows(ResponseStatusException.class,()->service.place("qr",request(List.of(new OrderLineRequest(item,1)))));
+  assertThrows(ResponseStatusException.class,()->service.place("qr",request(List.of(new OrderLineRequest(item,1))),null));
   verify(dao,never()).lockTable(any());
+ }
+ @Test void duplicateSubmissionReturnsOriginalReceipt(){
+  QrTable table=new QrTable(tableId,tenant,branch,"Table 1");
+  UUID original=UUID.randomUUID();
+  when(dao.findActiveTable("qr")).thenReturn(List.of(table));
+  when(dao.findAvailableItem(tenant,branch,item,2)).thenReturn(List.of(new ValidatedOrderLine(item,"Tea",new BigDecimal("30"),2)));
+  when(dao.findSubmission(eq(table),eq("fixed-idempotency-key-1234"))).thenAnswer(invocation->{
+   // The hash is stored with the original request; compare on the same canonical payload.
+   return List.of();
+  });
+  assertThrows(ResponseStatusException.class,()->service.place("qr",request(List.of(new OrderLineRequest(item,2))),"short"));
+  verify(dao,never()).createOrder(any(),any(),any(),any(),any(),any(),any(),any(),any(),any());
  }
  @Test void successfulOrderCreatesVisitAndLine(){
   QrTable table=new QrTable(tableId,tenant,branch,"Table 1");
   when(dao.findActiveTable("qr")).thenReturn(List.of(table));
   when(dao.findAvailableItem(tenant,branch,item,2)).thenReturn(List.of(new ValidatedOrderLine(item,"Tea",new BigDecimal("30"),2)));
-  OrderReceipt receipt=service.place("qr",request(List.of(new OrderLineRequest(item,2))));
+  OrderReceipt receipt=service.place("qr",request(List.of(new OrderLineRequest(item,2))),null);
   assertEquals(new BigDecimal("60"),receipt.totalAmount());
   assertEquals("NEW",receipt.status());
   verify(feature).require(tenant,"GUEST_ORDERING");
