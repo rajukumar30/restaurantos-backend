@@ -62,6 +62,12 @@ public class PlatformSubscriptionDao {
     public void lockTenant(UUID tenantId) {
         jdbc.queryForObject("SELECT id FROM tenants WHERE id = ? FOR UPDATE", UUID.class, tenantId);
     }
+    public boolean hasActiveSubscription(UUID tenantId) {
+        Integer count = jdbc.queryForObject(
+            "SELECT COUNT(*) FROM platform_restaurant_subscriptions WHERE tenant_id=? AND status='ACTIVE'",
+            Integer.class, tenantId);
+        return count != null && count > 0;
+    }
     public void cancelActiveForTenant(UUID tenantId) {
         jdbc.update("UPDATE platform_restaurant_subscriptions SET status='CANCELLED',updated_at=NOW() WHERE tenant_id=? AND status='ACTIVE'", tenantId);
     }
