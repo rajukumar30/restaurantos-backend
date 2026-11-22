@@ -1,68 +1,41 @@
 package com.restaurantos.modules.platform.controller;
 
-import com.restaurantos.modules.platform.repository.PlatformBillingDao;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.security.core.Authentication;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
+import com.restaurantos.modules.platform.service.PlatformBillingService;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/platform/billing")
 public class PlatformBillingController {
-    private final PlatformBillingDao dao;
-    public PlatformBillingController(PlatformBillingDao dao) { this.dao = dao; }
+    private final PlatformBillingService service;
+    public PlatformBillingController(PlatformBillingService service) { this.service = service; }
 
     public record PendingPaymentRequest(UUID tenantId, UUID subscriptionId, Long amountPaise, String idempotencyKey) {}
 
     @PostMapping("/payments/pending")
     public Map<String, Object> createPending(@RequestBody PendingPaymentRequest request) {
-        if (request == null || request.tenantId() == null || request.subscriptionId() == null
-            || request.amountPaise() == null || request.amountPaise() <= 0
-            || request.idempotencyKey() == null || !request.idempotencyKey().matches("[A-Za-z0-9_-]{12,100}")) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid payment request");
-        }
-        if (!dao.subscriptionBelongsToTenant(request.subscriptionId(), request.tenantId())) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Subscription not found for restaurant");
-        }
-        return Map.of("success", true, "data",
-            dao.createPending(request.tenantId(), request.subscriptionId(), request.amountPaise(), request.idempotencyKey()));
+        return Map.of("success", true, "data", service.createPending(request));
     }
 
     @GetMapping("/payments/by-key")
     public Map<String, Object> paymentByKey(@RequestParam String idempotencyKey) {
-        if (idempotencyKey == null || !idempotencyKey.matches("[A-Za-z0-9_-]{12,100}")) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid idempotency key");
-        }
-        Map<String, Object> payment = dao.findByIdempotencyKey(idempotencyKey);
-        if (payment == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Payment attempt not found");
-        }
-        return Map.of("success", true, "data", payment);
+        return Map.of("success", true, "data", service.paymentByKey(idempotencyKey));
     }
 
     @PostMapping("/payments/{paymentId}/mark-failed")
-    @Transactional
     public Map<String, Object> markFailed(@PathVariable UUID paymentId, Authentication authentication) {
         if (authentication == null || !(authentication.getPrincipal() instanceof UUID actorId)) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
         }
-        return Map.of("success", true, "data", dao.markFailed(paymentId, actorId));
+        return Map.of("success", true, "data", service.markFailed(paymentId, actorId));
     }
 
-    // SecurityConfig restricts /api/v1/platform/** to PLATFORM_ADMIN.
     @GetMapping("/payments")
     public Map<String, Object> payments(@RequestParam(required = false) UUID tenantId) {
-        List<Map<String, Object>> records = dao.recentPayments(tenantId);
-        return Map.of("success", true, "data", records);
+        return Map.of("success", true, "data", service.payments(tenantId));
     }
 }
