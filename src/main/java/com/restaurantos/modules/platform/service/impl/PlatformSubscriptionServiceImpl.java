@@ -28,6 +28,7 @@ public class PlatformSubscriptionServiceImpl implements PlatformSubscriptionServ
         UUID actor = actor(authentication);
         if (req == null || req.tenantId() == null || req.planId() == null || req.startsOn() == null
             || !("MONTHLY".equals(req.billingCycle()) || "ANNUAL".equals(req.billingCycle()))
+            || (req.customPricePaise() != null && (req.customPricePaise() < 0 || req.customPricePaise() > 100000000000L))
             || (req.freeUntil() != null && req.freeUntil().isBefore(req.startsOn()))
             || (req.endsOn() != null && req.endsOn().isBefore(req.startsOn()))
             || (req.freeUntil() != null && req.endsOn() != null && req.freeUntil().isAfter(req.endsOn()))) {
