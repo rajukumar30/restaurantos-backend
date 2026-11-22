@@ -41,17 +41,30 @@ class OrderPlacementServiceImplTest {
   assertThrows(ResponseStatusException.class,()->service.place("qr",request(List.of(new OrderLineRequest(item,1))),null));
   verify(dao,never()).lockTable(any());
  }
- @Test void duplicateSubmissionReturnsOriginalReceipt(){
+ @Test void duplicateSubmissionReturnsOriginalReceiptWithoutNewOrder(){
   QrTable table=new QrTable(tableId,tenant,branch,"Table 1");
   UUID original=UUID.randomUUID();
+  String key="fixed-idempotency-key-1234";
   when(dao.findActiveTable("qr")).thenReturn(List.of(table));
   when(dao.findAvailableItem(tenant,branch,item,2)).thenReturn(List.of(new ValidatedOrderLine(item,"Tea",new BigDecimal("30"),2)));
-  when(dao.findSubmission(eq(table),eq("fixed-idempotency-key-1234"))).thenAnswer(invocation->{
-   // The hash is stored with the original request; compare on the same canonical payload.
-   return List.of();
-  });
-  assertThrows(ResponseStatusException.class,()->service.place("qr",request(List.of(new OrderLineRequest(item,2))),"short"));
+  String canonical="Customer|+919876543210|"+ "|" +item+":2";
+  String hash;
+  try{
+   hash=HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+     .digest(canonical.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+  }catch(java.security.NoSuchAlgorithmException ex){throw new AssertionError(ex);}
+  when(dao.findSubmission(table,key)).thenReturn(List.of(Map.of(
+    "orderId",original,"orderNumber","R123","totalAmount",new BigDecimal("60"),
+    "status","NEW","requestHash",hash)));
+  OrderReceipt receipt=service.place("qr",request(List.of(new OrderLineRequest(item,2))),key);
+  assertEquals(original,receipt.orderId());
+  assertEquals("R123",receipt.orderNumber());
   verify(dao,never()).createOrder(any(),any(),any(),any(),any(),any(),any(),any(),any(),any());
+  verify(dao,never()).createOrderItem(any(),any(),any());
+ }
+ @Test void rejectsInvalidSubmissionKey(){
+  assertThrows(ResponseStatusException.class,()->service.place("qr",request(List.of(new OrderLineRequest(item,1))),"short"));
+  verifyNoInteractions(dao);
  }
  @Test void successfulOrderCreatesVisitAndLine(){
   QrTable table=new QrTable(tableId,tenant,branch,"Table 1");
