@@ -66,6 +66,35 @@ public class PlatformBillingDao {
             }, key).stream().findFirst().orElse(null);
     }
 
+    public Map<String, Object> markFailed(UUID paymentId, UUID actorId) {
+        // Only a pending, manually recorded attempt can be closed. No paid state is exposed.
+        List<Map<String, Object>> updated = jdbc.query("""
+            UPDATE platform_subscription_payments
+               SET status='FAILED', updated_at=NOW()
+             WHERE id=? AND status='PENDING' AND provider='MANUAL'
+            RETURNING id, tenant_id AS "tenantId", subscription_id AS "subscriptionId",
+                      amount_paise AS "amountPaise", status
+            """, (rs, i) -> {
+                Map<String, Object> row = new java.util.LinkedHashMap<>();
+                row.put("id", rs.getObject("id", UUID.class));
+                row.put("tenantId", rs.getObject("tenantId", UUID.class));
+                row.put("subscriptionId", rs.getObject("subscriptionId", UUID.class));
+                row.put("amountPaise", rs.getLong("amountPaise"));
+                row.put("status", rs.getString("status"));
+                return row;
+            }, paymentId);
+        if (updated.isEmpty()) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.CONFLICT, "Only pending manual payments can be closed");
+        }
+        Map<String, Object> payment = updated.get(0);
+        jdbc.update("""
+            INSERT INTO platform_admin_audit_logs(actor_user_id, tenant_id, action)
+            VALUES (?, ?, 'SUBSCRIPTION_PAYMENT_MARKED_FAILED')
+            """, actorId, payment.get("tenantId"));
+        return payment;
+    }
+
     public List<Map<String, Object>> recentPayments(UUID tenantId) {
         return jdbc.queryForList("""
             SELECT p.id, p.tenant_id AS "tenantId", t.name AS "restaurantName",
