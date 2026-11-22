@@ -38,7 +38,7 @@ public class OrderQueryServiceImpl implements OrderQueryService {
   access.requireBranchInTenant(tenantId,request.branchId());
   featureAccess.require(tenantId,"GUEST_ORDERING");
   String status=request.status().trim().toUpperCase(Locale.ROOT);
-  if(!List.of("SERVED","CANCELLED").contains(status))
+  if(!List.of("ACCEPTED","PREPARING","READY","SERVED","CANCELLED").contains(status))
    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Unsupported order status.");
   if(dao.updateStatus(tenantId,request.branchId(),orderId,status)==0)
    throw new ResponseStatusException(HttpStatus.CONFLICT,"Order status changed or this transition is not allowed.");
