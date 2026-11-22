@@ -69,9 +69,9 @@ public class PlatformInvoiceDao {
         for (int n=1;cursor.isBefore(periodStart) && n<=1200;n++) {
             cursor="MONTHLY".equals(cycle)?starts.plusMonths(n):starts.plusYears(n);
         }
-        if(periodStart.isAfter(LocalDate.now(java.time.ZoneOffset.UTC)) || !cursor.equals(periodStart))
+        if(periodStart.isAfter(LocalDate.now(java.time.ZoneOffset.UTC).plusDays(7)) || !cursor.equals(periodStart))
             throw new org.springframework.web.server.ResponseStatusException(
-                org.springframework.http.HttpStatus.BAD_REQUEST,"Period must start on a subscription billing anniversary");
+                org.springframework.http.HttpStatus.BAD_REQUEST,"Period must be a billing anniversary within the seven-day invoice window");
         LocalDate periodEnd=("MONTHLY".equals(cycle)?periodStart.plusMonths(1):periodStart.plusYears(1)).minusDays(1);
         if(ends!=null && periodEnd.isAfter(ends))periodEnd=ends;
         LocalDate freeUntil=(LocalDate)s.get("freeUntil");
