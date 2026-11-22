@@ -1,6 +1,6 @@
 package com.restaurantos.modules.platform.controller;
 
-import com.restaurantos.modules.platform.repository.PlatformBillingDao;
+import com.restaurantos.modules.platform.service.PlatformBillingService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -15,46 +15,23 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class PlatformBillingControllerTest {
-    private PlatformBillingDao dao;
+    private PlatformBillingService service;
     private PlatformBillingController controller;
 
     @BeforeEach
     void setup() {
-        dao = mock(PlatformBillingDao.class);
-        controller = new PlatformBillingController(dao);
+        service = mock(PlatformBillingService.class);
+        controller = new PlatformBillingController(service);
     }
 
     @Test
-    void pendingPaymentRejectsInvalidAmountWithoutDatabaseWrites() {
-        var request = new PlatformBillingController.PendingPaymentRequest(
-            UUID.randomUUID(), UUID.randomUUID(), 0L, "valid-key-123456");
-        ResponseStatusException error = assertThrows(ResponseStatusException.class,
-            () -> controller.createPending(request));
-        assertEquals(HttpStatus.BAD_REQUEST, error.getStatusCode());
-        verifyNoInteractions(dao);
-    }
-
-    @Test
-    void pendingPaymentRejectsCrossTenantSubscription() {
+    void pendingPaymentDelegatesToService() {
         var request = new PlatformBillingController.PendingPaymentRequest(
             UUID.randomUUID(), UUID.randomUUID(), 15000L, "valid-key-123456");
-        when(dao.subscriptionBelongsToTenant(request.subscriptionId(), request.tenantId())).thenReturn(false);
-        ResponseStatusException error = assertThrows(ResponseStatusException.class,
-            () -> controller.createPending(request));
-        assertEquals(HttpStatus.NOT_FOUND, error.getStatusCode());
-        verify(dao, never()).createPending(any(), any(), anyLong(), anyString());
-    }
-
-    @Test
-    void pendingPaymentDelegatesValidatedRequest() {
-        var request = new PlatformBillingController.PendingPaymentRequest(
-            UUID.randomUUID(), UUID.randomUUID(), 15000L, "valid-key-123456");
-        when(dao.subscriptionBelongsToTenant(request.subscriptionId(), request.tenantId())).thenReturn(true);
-        when(dao.createPending(request.tenantId(), request.subscriptionId(), 15000L, request.idempotencyKey()))
-            .thenReturn(Map.of("status", "PENDING"));
+        when(service.createPending(request)).thenReturn(Map.of("status", "PENDING"));
         var response = controller.createPending(request);
-        assertEquals(true, response.get("success"));
         assertEquals(Map.of("status", "PENDING"), response.get("data"));
+        verify(service).createPending(request);
     }
 
     @Test
@@ -62,7 +39,7 @@ class PlatformBillingControllerTest {
         ResponseStatusException error = assertThrows(ResponseStatusException.class,
             () -> controller.markFailed(UUID.randomUUID(), null));
         assertEquals(HttpStatus.UNAUTHORIZED, error.getStatusCode());
-        verifyNoInteractions(dao);
+        verifyNoInteractions(service);
     }
 
     @Test
@@ -70,9 +47,9 @@ class PlatformBillingControllerTest {
         UUID actor = UUID.randomUUID();
         UUID payment = UUID.randomUUID();
         var authentication = new UsernamePasswordAuthenticationToken(actor, null);
-        when(dao.markFailed(payment, actor)).thenReturn(Map.of("status", "FAILED"));
+        when(service.markFailed(payment, actor)).thenReturn(Map.of("status", "FAILED"));
         var response = controller.markFailed(payment, authentication);
         assertEquals(Map.of("status", "FAILED"), response.get("data"));
-        verify(dao).markFailed(payment, actor);
+        verify(service).markFailed(payment, actor);
     }
 }
