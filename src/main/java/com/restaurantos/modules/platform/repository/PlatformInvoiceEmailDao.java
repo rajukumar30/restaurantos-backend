@@ -11,6 +11,30 @@ public class PlatformInvoiceEmailDao {
     private final JdbcTemplate jdbc;
     public PlatformInvoiceEmailDao(JdbcTemplate jdbc){this.jdbc=jdbc;}
 
+    /** Aggregate delivery states without exposing email addresses or credentials. */
+    public List<Map<String,Object>> deliverySummary(){
+        return jdbc.queryForList("""
+            SELECT status,COUNT(*) AS "count"
+            FROM platform_invoice_reminder_emails
+            GROUP BY status ORDER BY status
+            """);
+    }
+
+    /** Recent deliveries for platform administrators; no recipient addresses returned. */
+    public List<Map<String,Object>> recentDeliveries(){
+        return jdbc.queryForList("""
+            SELECT e.id,e.status,e.attempts,e.created_at AS "createdAt",
+                   e.sent_at AS "sentAt",e.next_attempt_at AS "nextAttemptAt",
+                   e.last_error AS "lastError",t.name AS "restaurantName",
+                   r.reminder_type AS "reminderType",i.due_on AS "dueOn"
+            FROM platform_invoice_reminder_emails e
+            JOIN platform_invoice_reminders r ON r.id=e.reminder_id
+            JOIN platform_subscription_invoices i ON i.id=r.invoice_id
+            JOIN tenants t ON t.id=i.tenant_id
+            ORDER BY e.created_at DESC,e.id DESC LIMIT 50
+            """);
+    }
+
     /** Queue only current active owners, never restaurant staff or unrelated tenants. */
     public int enqueue(){
         return jdbc.update("""
