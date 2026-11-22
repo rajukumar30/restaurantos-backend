@@ -38,7 +38,7 @@ public class TenantAccessDao {
     }
     public boolean activeBranchExists(UUID tenantId, UUID branchId) {
         Integer count = jdbc.queryForObject("""
-            SELECT COUNT(*) FROM branches WHERE tenant_id=? AND id=? AND status='ACTIVE'
+            SELECT COUNT(*) FROM branches b JOIN tenants t ON t.id=b.tenant_id WHERE b.tenant_id=? AND b.id=? AND b.status='ACTIVE' AND t.status='ACTIVE'
             """, Integer.class, tenantId, branchId);
         return count != null && count > 0;
     }
