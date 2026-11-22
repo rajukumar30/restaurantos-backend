@@ -2,6 +2,9 @@ package com.restaurantos.modules.platform.controller;
 
 import com.restaurantos.modules.platform.repository.PlatformBillingDao;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.security.core.Authentication;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.http.HttpStatus;
@@ -45,6 +48,15 @@ public class PlatformBillingController {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Payment attempt not found");
         }
         return Map.of("success", true, "data", payment);
+    }
+
+    @PostMapping("/payments/{paymentId}/mark-failed")
+    @Transactional
+    public Map<String, Object> markFailed(@PathVariable UUID paymentId, Authentication authentication) {
+        if (authentication == null || !(authentication.getPrincipal() instanceof UUID actorId)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
+        }
+        return Map.of("success", true, "data", dao.markFailed(paymentId, actorId));
     }
 
     // SecurityConfig restricts /api/v1/platform/** to PLATFORM_ADMIN.
