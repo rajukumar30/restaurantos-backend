@@ -45,6 +45,27 @@ public class PlatformBillingDao {
         }
     }
 
+    public Map<String, Object> findByIdempotencyKey(String key) {
+        return jdbc.query("""
+            SELECT id, tenant_id AS "tenantId", subscription_id AS "subscriptionId",
+                   amount_paise AS "amountPaise", currency, status, provider,
+                   provider_payment_id AS "providerPaymentId", created_at AS "createdAt"
+            FROM platform_subscription_payments WHERE idempotency_key=?
+            """, (rs, i) -> {
+                Map<String, Object> row = new java.util.LinkedHashMap<>();
+                row.put("id", rs.getObject("id", UUID.class));
+                row.put("tenantId", rs.getObject("tenantId", UUID.class));
+                row.put("subscriptionId", rs.getObject("subscriptionId", UUID.class));
+                row.put("amountPaise", rs.getLong("amountPaise"));
+                row.put("currency", rs.getString("currency"));
+                row.put("status", rs.getString("status"));
+                row.put("provider", rs.getString("provider"));
+                row.put("providerPaymentId", rs.getString("providerPaymentId"));
+                row.put("createdAt", rs.getTimestamp("createdAt").toInstant());
+                return row;
+            }, key).stream().findFirst().orElse(null);
+    }
+
     public List<Map<String, Object>> recentPayments(UUID tenantId) {
         return jdbc.queryForList("""
             SELECT p.id, p.tenant_id AS "tenantId", t.name AS "restaurantName",
