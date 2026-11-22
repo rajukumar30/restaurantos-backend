@@ -145,6 +145,41 @@ class RealtimeChannelInterceptorTest {
         assertThrows(SecurityException.class, () -> interceptor.preSend(message(headers), null));
     }
 
+    private org.springframework.messaging.Message<byte[]> outboundOrderEvent(long expiry) {
+        StompHeaderAccessor headers = StompHeaderAccessor.create(StompCommand.MESSAGE);
+        headers.setSubscriptionId("sub-1");
+        headers.setDestination("/topic/tenants/" + tenant + "/branches/" + branch + "/orders");
+        headers.setUser(new UsernamePasswordAuthenticationToken(user, null, List.of()));
+        headers.setSessionAttributes(new java.util.HashMap<>(
+                java.util.Map.of("jwtExpiresAt", expiry)));
+        return message(headers);
+    }
+
+    @Test
+    void dropsOutboundEventAfterAccountRevocation() {
+        when(access.activeBranchExists(tenant, branch)).thenReturn(true);
+        when(access.hasPermission(user, tenant, branch, "orders:read")).thenReturn(true);
+        when(features.enabled(tenant, "GUEST_ORDERING")).thenReturn(true);
+        assertNotNull(interceptor.authorizeOutbound(outboundOrderEvent(System.currentTimeMillis() + 60000)));
+        when(admins.active(user)).thenReturn(false);
+        assertNull(interceptor.authorizeOutbound(outboundOrderEvent(System.currentTimeMillis() + 60000)));
+    }
+
+    @Test
+    void dropsOutboundEventAfterPermissionRevocation() {
+        when(access.activeBranchExists(tenant, branch)).thenReturn(true);
+        when(access.hasPermission(user, tenant, branch, "orders:read")).thenReturn(true);
+        when(features.enabled(tenant, "GUEST_ORDERING")).thenReturn(true);
+        assertNotNull(interceptor.authorizeOutbound(outboundOrderEvent(System.currentTimeMillis() + 60000)));
+        when(access.hasPermission(user, tenant, branch, "orders:read")).thenReturn(false);
+        assertNull(interceptor.authorizeOutbound(outboundOrderEvent(System.currentTimeMillis() + 60000)));
+    }
+
+    @Test
+    void dropsOutboundEventAfterJwtExpiry() {
+        assertNull(interceptor.authorizeOutbound(outboundOrderEvent(System.currentTimeMillis() - 1000)));
+    }
+
     @Test
     void rejectsGuestSubscriptionWithoutQrProof() {
         StompHeaderAccessor headers = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
