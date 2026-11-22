@@ -3,7 +3,6 @@ package com.restaurantos.modules.platform.repository;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import java.util.List;
-import org.springframework.dao.DuplicateKeyException;
 import java.util.Map;
 import java.util.UUID;
 
@@ -22,27 +21,38 @@ public class PlatformBillingDao {
     public Map<String, Object> createPending(UUID tenantId, UUID subscriptionId, long amountPaise,
                                                String idempotencyKey) {
         // Never accept payment success from a client. Every record starts as PENDING.
-        try {
-            return jdbc.queryForMap("""
-                INSERT INTO platform_subscription_payments
-                    (tenant_id, subscription_id, amount_paise, provider, idempotency_key)
-                VALUES (?, ?, ?, 'MANUAL', ?)
-                RETURNING id, tenant_id AS "tenantId", subscription_id AS "subscriptionId",
-                          amount_paise AS "amountPaise", status, provider, created_at AS "createdAt"
-                """, tenantId, subscriptionId, amountPaise, idempotencyKey);
-        } catch (DuplicateKeyException duplicate) {
-            Map<String, Object> existing = jdbc.queryForMap("""
-                SELECT id, tenant_id AS "tenantId", subscription_id AS "subscriptionId",
-                       amount_paise AS "amountPaise", status, provider, created_at AS "createdAt"
-                FROM platform_subscription_payments WHERE idempotency_key=?
-                """, idempotencyKey);
-            if (!tenantId.equals(existing.get("tenantId")) || !subscriptionId.equals(existing.get("subscriptionId"))
-                || ((Number) existing.get("amountPaise")).longValue() != amountPaise) {
-                throw new org.springframework.web.server.ResponseStatusException(
-                    org.springframework.http.HttpStatus.CONFLICT, "Idempotency key already used for another payment");
-            }
-            return existing;
+        // PostgreSQL ON CONFLICT is atomic under concurrent requests. Catching a unique
+        // constraint exception inside an open transaction leaves PostgreSQL aborted.
+        List<Map<String, Object>> inserted = jdbc.query("""
+            INSERT INTO platform_subscription_payments
+                (tenant_id, subscription_id, amount_paise, provider, idempotency_key)
+            VALUES (?, ?, ?, 'MANUAL', ?)
+            ON CONFLICT (idempotency_key) DO NOTHING
+            RETURNING id, tenant_id AS "tenantId", subscription_id AS "subscriptionId",
+                      amount_paise AS "amountPaise", status, provider, created_at AS "createdAt"
+            """, (rs, i) -> {
+                Map<String, Object> row = new java.util.LinkedHashMap<>();
+                row.put("id", rs.getObject("id", UUID.class));
+                row.put("tenantId", rs.getObject("tenantId", UUID.class));
+                row.put("subscriptionId", rs.getObject("subscriptionId", UUID.class));
+                row.put("amountPaise", rs.getLong("amountPaise"));
+                row.put("status", rs.getString("status"));
+                row.put("provider", rs.getString("provider"));
+                row.put("createdAt", rs.getTimestamp("createdAt").toInstant());
+                return row;
+            }, tenantId, subscriptionId, amountPaise, idempotencyKey);
+        if (!inserted.isEmpty()) return inserted.get(0);
+        Map<String, Object> existing = findByIdempotencyKey(idempotencyKey);
+        if (existing == null) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.CONFLICT, "Payment request is being processed; retry with the same key");
         }
+        if (!tenantId.equals(existing.get("tenantId")) || !subscriptionId.equals(existing.get("subscriptionId"))
+            || ((Number) existing.get("amountPaise")).longValue() != amountPaise) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.CONFLICT, "Idempotency key already used for another payment");
+        }
+        return existing;
     }
 
     public Map<String, Object> findByIdempotencyKey(String key) {
