@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import java.util.List;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.UUID;
 
 @Service
@@ -38,6 +40,12 @@ public class PlatformSubscriptionServiceImpl implements PlatformSubscriptionServ
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Restaurant not found");
         }
         dao.lockTenant(req.tenantId()); // All subscriptions for a tenant serialize on this row.
+        // A future-dated replacement must not cancel current access immediately.
+        // Scheduled transitions require a separate activation workflow.
+        if (req.startsOn().isAfter(LocalDate.now(ZoneOffset.UTC)) && dao.hasActiveSubscription(req.tenantId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "Cannot schedule a replacement while an active subscription exists. Choose today or later after the current subscription ends.");
+        }
         dao.cancelActiveForTenant(req.tenantId());
         UUID id = dao.insert(req);
         dao.audit(actor, req.tenantId(), "SUBSCRIPTION_ASSIGNED");
