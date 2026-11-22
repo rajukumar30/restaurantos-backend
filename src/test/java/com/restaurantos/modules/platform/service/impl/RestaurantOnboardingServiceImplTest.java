@@ -38,6 +38,19 @@ class RestaurantOnboardingServiceImplTest {
             () -> service.create(request("!!!"))).getStatusCode());
         verifyNoInteractions(dao);
     }
+    @Test void rejectsOverlongSlugBeforeWriting() {
+        assertEquals(HttpStatus.BAD_REQUEST, assertThrows(ResponseStatusException.class,
+            () -> service.create(request("a".repeat(64)))).getStatusCode());
+        verifyNoInteractions(dao);
+    }
+    @Test void trimsOwnerEmailBeforeCheckingUniquenessAndPersisting() {
+        when(encoder.encode(anyString())).thenReturn("bcrypt-hash");
+        CreateRestaurantRequest req = new CreateRestaurantRequest("New Place","Main","Owner",
+            "  Owner@EXAMPLE.com  ","a very safe password",null,null,null);
+        service.create(req);
+        verify(dao).emailExists("Owner@EXAMPLE.com");
+        verify(dao).insertOwner(any(),eq("Owner"),eq("owner@example.com"),isNull(),eq("bcrypt-hash"));
+    }
     @Test void reservedSubdomainsAreRenamed() {
         RestaurantCreated created = service.create(request("admin"));
         assertEquals("restaurant-admin", created.subdomain());
