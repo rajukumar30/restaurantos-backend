@@ -31,11 +31,17 @@ public class PlatformBillingDao {
                           amount_paise AS "amountPaise", status, provider, created_at AS "createdAt"
                 """, tenantId, subscriptionId, amountPaise, idempotencyKey);
         } catch (DuplicateKeyException duplicate) {
-            return jdbc.queryForMap("""
+            Map<String, Object> existing = jdbc.queryForMap("""
                 SELECT id, tenant_id AS "tenantId", subscription_id AS "subscriptionId",
                        amount_paise AS "amountPaise", status, provider, created_at AS "createdAt"
                 FROM platform_subscription_payments WHERE idempotency_key=?
                 """, idempotencyKey);
+            if (!tenantId.equals(existing.get("tenantId")) || !subscriptionId.equals(existing.get("subscriptionId"))
+                || ((Number) existing.get("amountPaise")).longValue() != amountPaise) {
+                throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.CONFLICT, "Idempotency key already used for another payment");
+            }
+            return existing;
         }
     }
 
