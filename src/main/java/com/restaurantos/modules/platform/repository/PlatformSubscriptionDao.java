@@ -17,7 +17,7 @@ public class PlatformSubscriptionDao {
 
     private static final String SELECT = """
         SELECT s.id, s.tenant_id, t.name AS restaurant_name, s.plan_id, p.name AS plan_name,
-               s.billing_cycle, s.starts_on, s.free_until, s.ends_on, s.status
+               s.billing_cycle, s.starts_on, s.free_until, s.ends_on, s.status, s.custom_price_paise
         FROM platform_restaurant_subscriptions s
         JOIN tenants t ON t.id = s.tenant_id
         JOIN platform_subscription_plans p ON p.id = s.plan_id
@@ -38,7 +38,7 @@ public class PlatformSubscriptionDao {
         return new Subscription(rs.getObject("id", UUID.class), rs.getObject("tenant_id", UUID.class),
             rs.getString("restaurant_name"), rs.getObject("plan_id", UUID.class),
             rs.getString("plan_name"), rs.getString("billing_cycle"), start, free, end,
-            status, freeNow, lifecycle);
+            status, freeNow, lifecycle, rs.getObject("custom_price_paise", Long.class));
     }
 
     public List<Subscription> list(UUID tenantId) {
@@ -73,9 +73,9 @@ public class PlatformSubscriptionDao {
     }
     public UUID insert(Assign req) {
         return jdbc.queryForObject("""
-            INSERT INTO platform_restaurant_subscriptions(tenant_id,plan_id,billing_cycle,starts_on,free_until,ends_on)
-            VALUES(?,?,?,?,?,?) RETURNING id
-            """, UUID.class, req.tenantId(), req.planId(), req.billingCycle(), req.startsOn(), req.freeUntil(), req.endsOn());
+            INSERT INTO platform_restaurant_subscriptions(tenant_id,plan_id,billing_cycle,starts_on,free_until,ends_on,custom_price_paise)
+            VALUES(?,?,?,?,?,?,?) RETURNING id
+            """, UUID.class, req.tenantId(), req.planId(), req.billingCycle(), req.startsOn(), req.freeUntil(), req.endsOn(), req.customPricePaise());
     }
     public UUID tenantForSubscription(UUID id) {
         return jdbc.query("SELECT tenant_id FROM platform_restaurant_subscriptions WHERE id = ?",
