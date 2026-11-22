@@ -51,19 +51,18 @@ public class PlatformInvoiceDao {
         String cycle=(String)s.get("billingCycle");
         // Period boundaries are anchored to the subscription start date.
         LocalDate cursor=starts;
-        while(cursor.isBefore(periodStart)) {
-            cursor="MONTHLY".equals(cycle)?cursor.plusMonths(1):cursor.plusYears(1);
-            if(cursor.isAfter(periodStart))break;
+        for (int n=1;cursor.isBefore(periodStart) && n<=1200;n++) {
+            cursor="MONTHLY".equals(cycle)?starts.plusMonths(n):starts.plusYears(n);
         }
-        if(!cursor.equals(periodStart))
+        if(periodStart.isAfter(LocalDate.now(java.time.ZoneOffset.UTC)) || !cursor.equals(periodStart))
             throw new org.springframework.web.server.ResponseStatusException(
                 org.springframework.http.HttpStatus.BAD_REQUEST,"Period must start on a subscription billing anniversary");
         LocalDate periodEnd=("MONTHLY".equals(cycle)?periodStart.plusMonths(1):periodStart.plusYears(1)).minusDays(1);
         if(ends!=null && periodEnd.isAfter(ends))periodEnd=ends;
         LocalDate freeUntil=(LocalDate)s.get("freeUntil");
-        if(freeUntil!=null && !periodEnd.isAfter(freeUntil))
+        if(freeUntil!=null && !freeUntil.isBefore(periodStart))
             throw new org.springframework.web.server.ResponseStatusException(
-                org.springframework.http.HttpStatus.CONFLICT,"Fully free billing period does not require an invoice");
+                org.springframework.http.HttpStatus.CONFLICT,"Free or partially free billing period requires separate prorating rules");
         long price=((Number)s.get("pricePaise")).longValue();
         if(price==0)throw new org.springframework.web.server.ResponseStatusException(
             org.springframework.http.HttpStatus.CONFLICT,"Free plan does not require a payment invoice");
