@@ -8,11 +8,13 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import java.time.LocalDate;
 import java.util.Map;
 import java.util.UUID;
 
 @Component
+@ConditionalOnProperty(name="restaurantos.billing.email-enabled",havingValue="true")
 public class PlatformInvoiceEmailDispatcher {
     private static final Logger log=LoggerFactory.getLogger(PlatformInvoiceEmailDispatcher.class);
     private final PlatformInvoiceEmailDao dao;
