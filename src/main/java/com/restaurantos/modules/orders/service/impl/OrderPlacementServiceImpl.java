@@ -11,6 +11,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.*;
 @Service
 public class OrderPlacementServiceImpl implements OrderPlacementService {
@@ -22,7 +25,9 @@ public class OrderPlacementServiceImpl implements OrderPlacementService {
  }
  @Override
  @Transactional
- public OrderReceipt place(String qrToken,PlaceOrderRequest request){
+ public OrderReceipt place(String qrToken,PlaceOrderRequest request,String idempotencyKey){
+  if(idempotencyKey!=null && !idempotencyKey.matches("[A-Za-z0-9_-]{16,100}"))
+   throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid idempotency key.");
   List<QrTable> tables=dao.findActiveTable(qrToken);
   if(tables.isEmpty())throw new ResponseStatusException(HttpStatus.NOT_FOUND,"This table QR code is invalid or inactive.");
   QrTable table=tables.getFirst();
@@ -40,7 +45,29 @@ public class OrderPlacementServiceImpl implements OrderPlacementService {
    lines.add(line);
    total=total.add(line.unitPrice().multiply(BigDecimal.valueOf(line.quantity())));
   }
+  String requestHash=null;
+  if(idempotencyKey!=null){
+   StringBuilder canonical=new StringBuilder(request.customerName().trim()).append('|')
+    .append(request.customerPhone()).append('|')
+    .append(request.notes()==null?"":request.notes().trim());
+   quantities.entrySet().stream().sorted(Map.Entry.comparingByKey())
+    .forEach(e->canonical.append('|').append(e.getKey()).append(':').append(e.getValue()));
+   try{
+    byte[] digest=MessageDigest.getInstance("SHA-256").digest(canonical.toString().getBytes(StandardCharsets.UTF_8));
+    requestHash=HexFormat.of().formatHex(digest);
+   }catch(NoSuchAlgorithmException ex){throw new IllegalStateException(ex);}
+  }
   dao.lockTable(table.tableId());
+  if(idempotencyKey!=null){
+   var existing=dao.findSubmission(table,idempotencyKey);
+   if(!existing.isEmpty()){
+    var old=existing.getFirst();
+    if(!Objects.equals(old.get("requestHash"),requestHash))
+     throw new ResponseStatusException(HttpStatus.CONFLICT,"This submission key was already used for a different order.");
+    return new OrderReceipt((UUID)old.get("orderId"),(String)old.get("orderNumber"),
+      table.displayName(),(BigDecimal)old.get("totalAmount"),(String)old.get("status"));
+   }
+  }
   List<UUID> visits=dao.activeVisits(table);
   UUID visitId;
   if(visits.isEmpty()){
@@ -55,7 +82,7 @@ public class OrderPlacementServiceImpl implements OrderPlacementService {
   UUID orderId=UUID.randomUUID();
   String orderNumber="R"+UUID.randomUUID().toString().replace("-","").substring(0,9).toUpperCase(Locale.ROOT);
   String notes=request.notes()==null||request.notes().isBlank()?null:request.notes().trim();
-  dao.createOrder(orderId,orderNumber,table,visitId,request.customerName().trim(),request.customerPhone(),notes,total);
+  dao.createOrder(orderId,orderNumber,table,visitId,request.customerName().trim(),request.customerPhone(),notes,total,idempotencyKey,requestHash);
   for(ValidatedOrderLine line:lines)dao.createOrderItem(table.tenantId(),orderId,line);
   events.publishAfterCommit(RealtimeEvent.orderChanged("ORDER_CREATED",table.tenantId(),table.branchId(),orderId));
   return new OrderReceipt(orderId,orderNumber,table.displayName(),total,"NEW");
