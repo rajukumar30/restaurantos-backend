@@ -4,6 +4,7 @@ import com.restaurantos.modules.platform.dto.RestaurantOnboardingDto.*;
 import com.restaurantos.modules.platform.repository.RestaurantOnboardingDao;
 import com.restaurantos.modules.platform.service.RestaurantOnboardingService;
 import org.springframework.http.HttpStatus;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,10 +39,15 @@ public class RestaurantOnboardingServiceImpl implements RestaurantOnboardingServ
             userId = UUID.randomUUID(), tenantUserId = UUID.randomUUID(),
             branchUserId = UUID.randomUUID(), roleId = UUID.randomUUID();
         String address = req.addressJson() == null || req.addressJson().isBlank() ? "{}" : req.addressJson();
-        dao.insertTenant(tenantId, req.restaurantName().trim(), slug, subdomain);
-        dao.insertBranch(branchId, tenantId, req.branchName().trim(), address, req.branchPhone());
-        dao.insertOwner(userId, req.ownerName().trim(), req.ownerEmail().trim().toLowerCase(Locale.ROOT),
-            req.ownerPhone(), encoder.encode(req.ownerPassword()));
+        try {
+            dao.insertTenant(tenantId, req.restaurantName().trim(), slug, subdomain);
+            dao.insertBranch(branchId, tenantId, req.branchName().trim(), address, req.branchPhone());
+            dao.insertOwner(userId, req.ownerName().trim(), req.ownerEmail().trim().toLowerCase(Locale.ROOT),
+                req.ownerPhone(), encoder.encode(req.ownerPassword()));
+        } catch (DuplicateKeyException duplicate) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "Restaurant name, subdomain, or owner email is already registered.", duplicate);
+        }
         dao.insertTenantMember(tenantUserId, tenantId, userId);
         dao.insertBranchMember(branchUserId, tenantId, branchId, tenantUserId);
         dao.insertOwnerRole(roleId, tenantId);
