@@ -31,7 +31,7 @@ public class PlatformSubscriptionDao {
         String status = rs.getString("status");
         boolean withinTerm = !today.isBefore(start) && (end == null || !today.isAfter(end));
         boolean freeNow = "ACTIVE".equals(status) && withinTerm && free != null && !today.isAfter(free);
-        String lifecycle = "CANCELLED".equals(status) ? "CANCELLED"
+        String lifecycle = !"ACTIVE".equals(status) ? status
             : today.isBefore(start) ? "SCHEDULED"
             : end != null && today.isAfter(end) ? "EXPIRED"
             : freeNow ? "FREE_PERIOD" : "ACTIVE";
