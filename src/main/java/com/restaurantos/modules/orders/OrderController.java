@@ -41,6 +41,12 @@ public class OrderController {
         return ApiResponse.success("Orders loaded",orderQueries.list(tenantId,branchId,authentication));
     }
 
+    @GetMapping("/api/v1/tenants/{tenantId}/orders/{orderId}")
+    public ApiResponse<OrderSummary> getOrder(@PathVariable UUID tenantId,
+            @PathVariable UUID orderId,@RequestParam UUID branchId,Authentication authentication){
+        return ApiResponse.success("Order loaded",orderQueries.get(tenantId,branchId,orderId,authentication));
+    }
+
     @PatchMapping("/api/v1/tenants/{tenantId}/orders/{orderId}/status")
     public ApiResponse<OrderStatusUpdated> updateStatus(@PathVariable UUID tenantId,
             @PathVariable UUID orderId,@Valid @RequestBody UpdateOrderStatusRequest request,
