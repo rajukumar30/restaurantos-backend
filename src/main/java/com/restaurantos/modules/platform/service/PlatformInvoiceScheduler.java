@@ -14,7 +14,7 @@ import java.util.UUID;
 
 /**
  * Opt-in invoice issuance. One daily pass issues only invoices whose billing
- * anniversary is today; missed days require a deliberate backfill policy.
+ * anniversary falls within the next seven days, including today.
  * Database uniqueness makes retries safe across multiple app instances.
  */
 @Component
@@ -45,14 +45,19 @@ public class PlatformInvoiceScheduler {
             UUID subscriptionId=(UUID)candidate.get("id");
             LocalDate starts=(LocalDate)candidate.get("startsOn");
             String cycle=(String)candidate.get("billingCycle");
-            long periods="MONTHLY".equals(cycle)
-                ?ChronoUnit.MONTHS.between(starts.withDayOfMonth(1),today.withDayOfMonth(1))
-                :ChronoUnit.YEARS.between(starts,today);
-            if(periods<0)continue;
-            LocalDate anniversary="MONTHLY".equals(cycle)?starts.plusMonths(periods):starts.plusYears(periods);
-            if(!today.equals(anniversary))continue;
+            LocalDate anniversary=null;
+            for(int offset=0;offset<=7;offset++){
+                LocalDate target=today.plusDays(offset);
+                long periods="MONTHLY".equals(cycle)
+                    ?ChronoUnit.MONTHS.between(starts.withDayOfMonth(1),target.withDayOfMonth(1))
+                    :ChronoUnit.YEARS.between(starts,target);
+                if(periods<0)continue;
+                LocalDate calculated="MONTHLY".equals(cycle)?starts.plusMonths(periods):starts.plusYears(periods);
+                if(target.equals(calculated)){anniversary=target;break;}
+            }
+            if(anniversary==null)continue;
             try {
-                service.issue(subscriptionId,today);
+                service.issue(subscriptionId,anniversary);
                 issued++;
             }catch(Exception ex) {
                 failed++;
