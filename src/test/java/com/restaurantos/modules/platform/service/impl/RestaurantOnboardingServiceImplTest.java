@@ -3,6 +3,7 @@ package com.restaurantos.modules.platform.service.impl;
 import com.restaurantos.modules.platform.dto.RestaurantOnboardingDto.*;
 import com.restaurantos.modules.platform.repository.RestaurantOnboardingDao;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.server.ResponseStatusException;
@@ -50,6 +51,13 @@ class RestaurantOnboardingServiceImplTest {
         service.create(req);
         verify(dao).emailExists("Owner@EXAMPLE.com");
         verify(dao).insertOwner(any(),eq("Owner"),eq("owner@example.com"),isNull(),eq("bcrypt-hash"));
+    }
+    @Test void concurrentDuplicateCreationReturnsConflict() {
+        doThrow(new DuplicateKeyException("unique constraint")).when(dao)
+            .insertTenant(any(),any(),any(),any());
+        assertEquals(HttpStatus.CONFLICT,assertThrows(ResponseStatusException.class,
+            ()->service.create(request("Concurrent Place"))).getStatusCode());
+        verify(dao,never()).insertOwner(any(),any(),any(),any(),any());
     }
     @Test void reservedSubdomainsAreRenamed() {
         RestaurantCreated created = service.create(request("admin"));
