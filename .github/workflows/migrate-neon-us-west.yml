@@ -1,0 +1,41 @@
+name: Migrate Krlio Neon database to US West
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check configured credentials
+        env:
+          SOURCE_DATABASE_URL: ${{ secrets.KRLIO_SOURCE_DATABASE_URL }}
+          TARGET_DATABASE_URL: ${{ secrets.KRLIO_TARGET_DATABASE_URL }}
+        run: |
+          test -n "$SOURCE_DATABASE_URL" || { echo "Missing KRLIO_SOURCE_DATABASE_URL"; exit 1; }
+          test -n "$TARGET_DATABASE_URL" || { echo "Missing KRLIO_TARGET_DATABASE_URL"; exit 1; }
+          test "$SOURCE_DATABASE_URL" != "$TARGET_DATABASE_URL" || { echo "Source and target must differ"; exit 1; }
+      - name: Dump source and restore into empty destination
+        env:
+          SOURCE_DATABASE_URL: ${{ secrets.KRLIO_SOURCE_DATABASE_URL }}
+          TARGET_DATABASE_URL: ${{ secrets.KRLIO_TARGET_DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          docker run --rm --network host \
+            -e SOURCE_DATABASE_URL -e TARGET_DATABASE_URL \
+            postgres:18 bash -euo pipefail -c '
+              source_count=$(psql "$SOURCE_DATABASE_URL" -X -A -t -v ON_ERROR_STOP=1 -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = '\''public'\'' AND table_type = '\''BASE TABLE'\''")
+              target_count=$(psql "$TARGET_DATABASE_URL" -X -A -t -v ON_ERROR_STOP=1 -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = '\''public'\'' AND table_type = '\''BASE TABLE'\''")
+              echo "Source tables: $source_count; target tables: $target_count"
+              test "$source_count" -gt 0 || { echo "Source has no tables"; exit 1; }
+              test "$target_count" -eq 0 || { echo "Destination is not empty; refusing to overwrite"; exit 1; }
+              pg_dump --dbname="$SOURCE_DATABASE_URL" --format=custom --no-owner --no-acl --file=/tmp/krlio.dump
+              pg_restore --dbname="$TARGET_DATABASE_URL" --no-owner --no-acl --exit-on-error --single-transaction /tmp/krlio.dump
+              restored_count=$(psql "$TARGET_DATABASE_URL" -X -A -t -v ON_ERROR_STOP=1 -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = '\''public'\'' AND table_type = '\''BASE TABLE'\''")
+              echo "Restored tables: $restored_count"
+              test "$restored_count" = "$source_count"
+            '
