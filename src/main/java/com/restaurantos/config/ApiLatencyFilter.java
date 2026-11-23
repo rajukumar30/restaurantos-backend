@@ -11,6 +11,7 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.servlet.HandlerMapping;
 
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
@@ -45,8 +46,10 @@ public class ApiLatencyFilter extends OncePerRequestFilter {
             }
             if (elapsedMs >= slowRequestMs) {
                 // Avoid logging raw paths: identifiers in URL segments may be sensitive.
-                log.warn("Slow API request method={} status={} durationMs={}",
-                        request.getMethod(), response.getStatus(), elapsedMs);
+                Object matchedRoute = request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
+                String route = matchedRoute instanceof String ? (String) matchedRoute : "unmatched";
+                log.warn("Slow API request method={} route={} status={} durationMs={}",
+                        request.getMethod(), route, response.getStatus(), elapsedMs);
             }
         }
     }
