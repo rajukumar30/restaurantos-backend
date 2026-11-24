@@ -25,6 +25,25 @@ public class AuthDao {
    WHERE tu.user_id=? AND tu.tenant_id=? AND tu.status='ACTIVE'
    """,(rs,i)->rs.getString(1),userId,tenantId);
  }
+ public record MembershipWithRoles(TenantMembership membership, List<String> roleKeys) {}
+ public List<MembershipWithRoles> activeMembershipsWithRoles(UUID userId){
+  return jdbc.query("""
+   SELECT tu.tenant_id,t.name AS tenant_name,
+          string_agg(DISTINCT r.display_name,', ' ORDER BY r.display_name) AS role_names,
+          array_agg(DISTINCT r.role_key) FILTER (WHERE r.role_key IS NOT NULL) AS role_keys
+   FROM tenant_users tu
+   JOIN tenants t ON t.id=tu.tenant_id AND t.status='ACTIVE'
+   LEFT JOIN user_roles ur ON ur.tenant_id=tu.tenant_id AND ur.tenant_user_id=tu.id
+   LEFT JOIN roles r ON r.id=ur.role_id
+   WHERE tu.user_id=? AND tu.status='ACTIVE'
+   GROUP BY tu.tenant_id,t.name ORDER BY t.name
+   """,(rs,i)->{
+    java.sql.Array keys=rs.getArray("role_keys");
+    List<String> roles=keys==null?List.of():java.util.Arrays.asList((String[])keys.getArray());
+    if(keys!=null)keys.free();
+    return new MembershipWithRoles(new TenantMembership(rs.getObject("tenant_id",UUID.class),rs.getString("tenant_name"),rs.getString("role_names")),roles);
+   },userId);
+ }
  public List<TenantMembership> activeMemberships(UUID userId){
   return jdbc.query("""
    SELECT tu.tenant_id,t.name AS tenant_name,
