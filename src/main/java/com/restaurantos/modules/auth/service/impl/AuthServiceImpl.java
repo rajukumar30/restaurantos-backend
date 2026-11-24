@@ -40,8 +40,9 @@ public class AuthServiceImpl implements AuthService {
   AuthUser user=users.getFirst();
   List<String> authorities=new ArrayList<>();
   if(dao.isPlatformAdmin(user.id()))authorities.add("PLATFORM_ADMIN");
-  List<TenantMembership> memberships=dao.activeMemberships(user.id()).stream()
-   .filter(m->allowedMembership(user.id(),m.tenantId())).toList();
+  List<TenantMembership> memberships=dao.activeMembershipsWithRoles(user.id()).stream()
+   .filter(m->allowedMembership(m.roleKeys(),m.membership().tenantId()))
+   .map(AuthDao.MembershipWithRoles::membership).toList();
   long membershipsChecked=System.nanoTime();
   if(!memberships.isEmpty())authorities.add("TENANT_USER");
   if(authorities.isEmpty())throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Account disabled or access denied. Contact your restaurant administrator.");
@@ -55,8 +56,8 @@ public class AuthServiceImpl implements AuthService {
    TimeUnit.NANOSECONDS.toMillis(finished-start), memberships.size());
   return new LoginResponse(token,"Bearer",user.id(),user.name(),user.email(),authorities,memberships);
  }
- private boolean allowedMembership(java.util.UUID userId,java.util.UUID tenantId){
-  Set<String> roles=new java.util.HashSet<>(dao.roleKeys(userId,tenantId).stream()
+ private boolean allowedMembership(List<String> roleKeys,java.util.UUID tenantId){
+  Set<String> roles=new java.util.HashSet<>(roleKeys.stream()
    .map(r->r.toUpperCase(Locale.ROOT)).toList());
   if(roles.isEmpty())return false;
   // Owner or other non-operational roles retain access to restaurant administration.
