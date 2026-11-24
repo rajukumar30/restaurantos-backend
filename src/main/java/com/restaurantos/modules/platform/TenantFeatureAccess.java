@@ -24,16 +24,18 @@ public class TenantFeatureAccess {
         this.dao=dao; this.subscriptionGate=subscriptionGate;
     }
     public boolean enabled(UUID tenantId, String featureKey) {
-        return enabledRecursive(tenantId,featureKey,new HashSet<>());
+        if (tenantId == null || featureKey == null) return false;
+        Set<String> keys = new HashSet<>();
+        if (!collect(featureKey, keys, new HashSet<>())) return false;
+        return dao.allEntitled(tenantId, keys);
     }
-    private boolean enabledRecursive(UUID tenantId, String featureKey, Set<String> visited) {
-        if (!visited.add(featureKey)) return false;
-        if (!dao.enabled(tenantId,featureKey)) return false;
-        try { subscriptionGate.require(tenantId, featureKey); }
-        catch (ResponseStatusException denied) { return false; }
-        for (String dependency : DEPENDENCIES.getOrDefault(featureKey,List.of())) {
-            if (!enabledRecursive(tenantId,dependency,visited)) return false;
+    private boolean collect(String key, Set<String> keys, Set<String> visiting) {
+        if (!visiting.add(key)) return false;
+        keys.add(key);
+        for (String dependency : DEPENDENCIES.getOrDefault(key,List.of())) {
+            if (!collect(dependency,keys,visiting)) return false;
         }
+        visiting.remove(key);
         return true;
     }
     public void require(UUID tenantId, String featureKey) {
