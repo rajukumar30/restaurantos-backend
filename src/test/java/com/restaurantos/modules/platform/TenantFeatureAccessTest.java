@@ -1,39 +1,40 @@
 package com.restaurantos.modules.platform;
+
 import com.restaurantos.modules.platform.repository.TenantFeatureAccessDao;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.server.ResponseStatusException;
+import java.util.Set;
 import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class TenantFeatureAccessTest {
- @Test void blocksFeatureWhenSubscriptionGateDeniesIt(){
-  TenantFeatureAccessDao dao=mock(TenantFeatureAccessDao.class);
-  RestaurantFeatureAccessService gate=mock(RestaurantFeatureAccessService.class);
-  UUID tenant=UUID.randomUUID();
-  when(dao.enabled(tenant,"QR_MENU")).thenReturn(true);
-  doThrow(new ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN))
-   .when(gate).require(tenant,"QR_MENU");
-  TenantFeatureAccess access=new TenantFeatureAccess(dao,gate);
+ private final TenantFeatureAccessDao dao=mock(TenantFeatureAccessDao.class);
+ private final RestaurantFeatureAccessService gate=mock(RestaurantFeatureAccessService.class);
+ private final TenantFeatureAccess access=new TenantFeatureAccess(dao,gate);
+ private final UUID tenant=UUID.randomUUID();
+
+ @Test void deniesWhenEntitlementMissing(){
+  when(dao.allEntitled(tenant,Set.of("QR_MENU"))).thenReturn(false);
   assertFalse(access.enabled(tenant,"QR_MENU"));
   assertThrows(ResponseStatusException.class,()->access.require(tenant,"QR_MENU"));
  }
- @Test void enforcesDependenciesAcrossPlanAndGrants(){
-  TenantFeatureAccessDao dao=mock(TenantFeatureAccessDao.class);
-  RestaurantFeatureAccessService gate=mock(RestaurantFeatureAccessService.class);
-  UUID tenant=UUID.randomUUID();
-  when(dao.enabled(tenant,"GUEST_ORDERING")).thenReturn(true);
-  when(dao.enabled(tenant,"QR_MENU")).thenReturn(true);
-  doThrow(new ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN))
-   .when(gate).require(tenant,"QR_MENU");
-  assertFalse(new TenantFeatureAccess(dao,gate).enabled(tenant,"GUEST_ORDERING"));
+ @Test void enforcesTransitiveDependenciesInSingleQuery(){
+  Set<String> keys=Set.of("KITCHEN_DISPLAY","GUEST_ORDERING","QR_MENU");
+  when(dao.allEntitled(tenant,keys)).thenReturn(false);
+  assertFalse(access.enabled(tenant,"KITCHEN_DISPLAY"));
+  verify(dao).allEntitled(tenant,keys);
+  verifyNoMoreInteractions(dao);
  }
- @Test void allowsFeatureWhenAllGatesAllow(){
-  TenantFeatureAccessDao dao=mock(TenantFeatureAccessDao.class);
-  RestaurantFeatureAccessService gate=mock(RestaurantFeatureAccessService.class);
-  UUID tenant=UUID.randomUUID();
-  when(dao.enabled(tenant,"QR_MENU")).thenReturn(true);
-  assertTrue(new TenantFeatureAccess(dao,gate).enabled(tenant,"QR_MENU"));
-  verify(gate).require(tenant,"QR_MENU");
+ @Test void allowsFeatureWhenAllEntitlementsAllow(){
+  when(dao.allEntitled(tenant,Set.of("GUEST_ORDERING","QR_MENU"))).thenReturn(true);
+  assertDoesNotThrow(()->access.require(tenant,"GUEST_ORDERING"));
+  verify(dao).allEntitled(tenant,Set.of("GUEST_ORDERING","QR_MENU"));
+  verifyNoMoreInteractions(dao);
+ }
+ @Test void nullInputFailsClosed(){
+  assertFalse(access.enabled(null,"QR_MENU"));
+  assertFalse(access.enabled(tenant,null));
+  verifyNoInteractions(dao);
  }
 }

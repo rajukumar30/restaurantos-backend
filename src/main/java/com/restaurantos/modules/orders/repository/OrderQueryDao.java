@@ -25,11 +25,12 @@ public class OrderQueryDao {
           rt.display_name AS table_name,COUNT(oi.id) AS line_count,
           COALESCE(SUM(oi.quantity),0) AS item_count,
           COALESCE(string_agg(oi.item_name || ' × ' || oi.quantity,', ' ORDER BY oi.created_at),'') AS items_summary
-   FROM restaurant_orders o
+   FROM (SELECT * FROM restaurant_orders WHERE tenant_id=? AND branch_id=?
+         ORDER BY created_at DESC,id DESC LIMIT 100) o
    JOIN restaurant_tables rt ON rt.tenant_id=o.tenant_id AND rt.id=o.table_id
    LEFT JOIN restaurant_order_items oi ON oi.tenant_id=o.tenant_id AND oi.order_id=o.id
-   WHERE o.tenant_id=? AND o.branch_id=?
-   GROUP BY o.id,rt.display_name ORDER BY o.created_at DESC LIMIT 100
+   GROUP BY o.id,o.order_number,o.status,o.total_amount,o.created_at,rt.display_name
+   ORDER BY o.created_at DESC,o.id DESC
    """,(rs,row)->new OrderSummary(rs.getObject("id",UUID.class),rs.getString("order_number"),
     rs.getString("table_name"),rs.getString("status"),rs.getBigDecimal("total_amount"),
     rs.getInt("line_count"),rs.getInt("item_count"),rs.getString("items_summary"),
