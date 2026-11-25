@@ -29,6 +29,27 @@ public class TenantFeatureAccess {
         if (!collect(featureKey, keys, new HashSet<>())) return false;
         return dao.allEntitled(tenantId, keys);
     }
+    /** Evaluate all requested feature closures in one database round trip. */
+    public Set<String> enabledFeatures(UUID tenantId, Collection<String> requested) {
+        if (tenantId == null || requested == null || requested.isEmpty()) return Set.of();
+        Map<String,Set<String>> closures = new HashMap<>();
+        Set<String> all = new HashSet<>();
+        for (String key : requested) {
+            if (key == null || !key.matches("[A-Z][A-Z0-9_]{0,63}")) continue;
+            Set<String> closure = new HashSet<>();
+            if (collect(key, closure, new HashSet<>())) {
+                closures.put(key, closure);
+                all.addAll(closure);
+            }
+        }
+        if (all.isEmpty()) return Set.of();
+        Set<String> entitled = dao.entitledKeys(tenantId, all);
+        Set<String> result = new HashSet<>();
+        closures.forEach((key, closure) -> {
+            if (entitled.containsAll(closure)) result.add(key);
+        });
+        return Set.copyOf(result);
+    }
     private boolean collect(String key, Set<String> keys, Set<String> visiting) {
         if (!visiting.add(key)) return false;
         keys.add(key);

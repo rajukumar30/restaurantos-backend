@@ -11,9 +11,24 @@ public class TenantFeatureAccessDao {
     public TenantFeatureAccessDao(JdbcTemplate jdbc) { this.jdbc = jdbc; }
 
     public boolean allEntitled(UUID tenantId, java.util.Set<String> keys) {
-        if (tenantId == null || keys.isEmpty() || keys.stream().anyMatch(k -> k == null || !k.matches("[A-Z][A-Z0-9_]{0,63}"))) return false;
+        if (!validKeys(tenantId, keys)) return false;
+        Long count = jdbc.queryForObject(entitlementSql(keys), Long.class, arguments(tenantId, keys));
+        return count != null && count == keys.size();
+    }
+
+    public java.util.Set<String> entitledKeys(UUID tenantId, java.util.Set<String> keys) {
+        if (!validKeys(tenantId, keys)) return java.util.Set.of();
+        String sql = entitlementSql(keys).replace("SELECT count(DISTINCT f.feature_key)", "SELECT DISTINCT f.feature_key");
+        return java.util.Set.copyOf(jdbc.queryForList(sql, String.class, arguments(tenantId, keys)));
+    }
+
+    private boolean validKeys(UUID tenantId, java.util.Set<String> keys) {
+        return tenantId != null && keys != null && !keys.isEmpty() && keys.stream().allMatch(k -> k != null && k.matches("[A-Z][A-Z0-9_]{0,63}"));
+    }
+
+    private String entitlementSql(java.util.Set<String> keys) {
         String placeholders = String.join(",", java.util.Collections.nCopies(keys.size(), "?"));
-        String sql = """
+        return """
             SELECT count(DISTINCT f.feature_key)
             FROM tenants t
             JOIN LATERAL (
@@ -36,11 +51,13 @@ public class TenantFeatureAccessDao {
               ))
               AND f.feature_key IN (
             """ + placeholders + ")";
+    }
+
+    private Object[] arguments(UUID tenantId, java.util.Set<String> keys) {
         java.util.List<Object> args = new java.util.ArrayList<>();
         args.add(tenantId);
         args.addAll(keys);
-        Long count = jdbc.queryForObject(sql, Long.class, args.toArray());
-        return count != null && count == keys.size();
+        return args.toArray();
     }
 
     public boolean enabled(UUID tenantId, String featureKey) {

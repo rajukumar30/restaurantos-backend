@@ -32,6 +32,13 @@ class TenantFeatureAccessTest {
   verify(dao).allEntitled(tenant,Set.of("GUEST_ORDERING","QR_MENU"));
   verifyNoMoreInteractions(dao);
  }
+ @Test void batchChecksEachDependencyClosureWithoutGrantingMissingFeatures(){
+  Set<String> keys=Set.of("KITCHEN_DISPLAY","WAITER_DASHBOARD","GUEST_ORDERING","QR_MENU","SERVICE_REQUESTS");
+  when(dao.entitledKeys(tenant,keys)).thenReturn(Set.of("KITCHEN_DISPLAY","WAITER_DASHBOARD","QR_MENU","SERVICE_REQUESTS"));
+  assertEquals(Set.of("QR_MENU","SERVICE_REQUESTS"),access.enabledFeatures(tenant,keys));
+  verify(dao).entitledKeys(tenant,keys);
+  verifyNoMoreInteractions(dao);
+ }
  @Test void nullInputFailsClosed(){
   assertFalse(access.enabled(null,"QR_MENU"));
   assertFalse(access.enabled(tenant,null));

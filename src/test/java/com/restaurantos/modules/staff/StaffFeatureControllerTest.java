@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.server.ResponseStatusException;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -25,10 +26,11 @@ class StaffFeatureControllerTest {
   UUID user=UUID.randomUUID(),tenant=UUID.randomUUID();
   when(authentication.getPrincipal()).thenReturn(user);
   when(auth.roleKeys(user,tenant)).thenReturn(List.of("WAITER"));
-  when(features.enabled(tenant,"WAITER_DASHBOARD")).thenReturn(true);
+  List<String> keys=List.of("KITCHEN_DISPLAY","WAITER_DASHBOARD","GUEST_ORDERING","QR_MENU","SERVICE_REQUESTS");
+  when(features.enabledFeatures(tenant,keys)).thenReturn(Set.of("WAITER_DASHBOARD"));
   var result=controller.available(tenant,authentication);
   assertNotNull(result);
-  verify(features).enabled(tenant,"WAITER_DASHBOARD");
-  verify(features).enabled(tenant,"KITCHEN_DISPLAY");
+  verify(features).enabledFeatures(tenant,keys);
+  verifyNoMoreInteractions(features);
  }
 }

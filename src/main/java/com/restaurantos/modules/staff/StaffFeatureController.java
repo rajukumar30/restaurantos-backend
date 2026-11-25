@@ -24,7 +24,8 @@ public class StaffFeatureController {
   if(authentication==null||!(authentication.getPrincipal() instanceof UUID userId)
       ||auth.roleKeys(userId,tenantId).isEmpty())
    throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Account disabled or access denied");
+  Set<String> enabled=features.enabledFeatures(tenantId,KEYS);
   return ApiResponse.success("Staff features",new FeatureAccess(KEYS.stream()
-   .map(key->new Feature(key,features.enabled(tenantId,key))).toList()));
+   .map(key->new Feature(key,enabled.contains(key))).toList()));
  }
 }
