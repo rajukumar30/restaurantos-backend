@@ -29,6 +29,32 @@ public class OrderPlacementDao {
    """,(rs,row)->new ValidatedOrderLine(rs.getObject("id",UUID.class),
     rs.getString("name"),rs.getBigDecimal("price"),quantity),tenantId,itemId,branchId);
  }
+ public List<ValidatedOrderLine> findAvailableItems(UUID tenantId,UUID branchId,Map<UUID,Integer> quantities){
+  if(quantities.isEmpty())return List.of();
+  String placeholders=String.join(",",Collections.nCopies(quantities.size(),"?"));
+  List<Object> args=new ArrayList<>();
+  args.add(tenantId);args.add(branchId);args.addAll(quantities.keySet());
+  return jdbc.query("""
+   SELECT mi.id,mi.name,COALESCE(bmi.price_override,mi.base_price) AS price
+   FROM menu_items mi
+   JOIN menu_categories mc ON mc.tenant_id=mi.tenant_id AND mc.id=mi.category_id
+   JOIN branch_menu_items bmi ON bmi.tenant_id=mi.tenant_id AND bmi.menu_item_id=mi.id
+   WHERE mi.tenant_id=? AND bmi.branch_id=?
+    AND mi.is_active=TRUE AND mc.is_active=TRUE AND bmi.is_available=TRUE
+    AND mi.id IN (
+   """+placeholders+")",(rs,row)->{
+    UUID id=rs.getObject("id",UUID.class);
+    return new ValidatedOrderLine(id,rs.getString("name"),rs.getBigDecimal("price"),quantities.get(id));
+   },args.toArray());
+ }
+ public void createOrderItems(UUID tenantId,UUID orderId,List<ValidatedOrderLine> lines){
+  List<Object[]> rows=lines.stream().map(line->new Object[]{tenantId,orderId,line.menuItemId(),line.itemName(),line.quantity(),line.unitPrice(),line.unitPrice().multiply(BigDecimal.valueOf(line.quantity()))}).toList();
+  jdbc.batchUpdate("""
+   INSERT INTO restaurant_order_items
+    (tenant_id,order_id,menu_item_id,item_name,quantity,unit_price,line_total)
+   VALUES(?,?,?,?,?,?,?)
+   """,rows);
+ }
  public void lockTable(UUID tableId){
   jdbc.queryForObject("SELECT id FROM restaurant_tables WHERE id=? FOR UPDATE",UUID.class,tableId);
  }

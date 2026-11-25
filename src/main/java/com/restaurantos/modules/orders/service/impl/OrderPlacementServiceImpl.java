@@ -36,15 +36,11 @@ public class OrderPlacementServiceImpl implements OrderPlacementService {
   for(OrderLineRequest line:request.items())quantities.merge(line.menuItemId(),line.quantity(),Integer::sum);
   if(quantities.values().stream().anyMatch(quantity->quantity>20))
    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"A maximum of 20 units per menu item can be ordered.");
-  List<ValidatedOrderLine> lines=new ArrayList<>();
-  BigDecimal total=BigDecimal.ZERO;
-  for(Map.Entry<UUID,Integer> entry:quantities.entrySet()){
-   List<ValidatedOrderLine> available=dao.findAvailableItem(table.tenantId(),table.branchId(),entry.getKey(),entry.getValue());
-   if(available.isEmpty())throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"One or more selected menu items are no longer available.");
-   ValidatedOrderLine line=available.getFirst();
-   lines.add(line);
-   total=total.add(line.unitPrice().multiply(BigDecimal.valueOf(line.quantity())));
-  }
+  List<ValidatedOrderLine> lines=dao.findAvailableItems(table.tenantId(),table.branchId(),quantities);
+  if(lines.size()!=quantities.size()||!lines.stream().map(ValidatedOrderLine::menuItemId).collect(java.util.stream.Collectors.toSet()).equals(quantities.keySet()))
+   throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"One or more selected menu items are no longer available.");
+  BigDecimal total=lines.stream().map(line->line.unitPrice().multiply(BigDecimal.valueOf(line.quantity())))
+    .reduce(BigDecimal.ZERO,BigDecimal::add);
   String requestHash=null;
   if(idempotencyKey!=null){
    StringBuilder canonical=new StringBuilder(request.customerName().trim()).append('|')
@@ -83,7 +79,7 @@ public class OrderPlacementServiceImpl implements OrderPlacementService {
   String orderNumber="R"+UUID.randomUUID().toString().replace("-","").substring(0,9).toUpperCase(Locale.ROOT);
   String notes=request.notes()==null||request.notes().isBlank()?null:request.notes().trim();
   dao.createOrder(orderId,orderNumber,table,visitId,request.customerName().trim(),request.customerPhone(),notes,total,idempotencyKey,requestHash);
-  for(ValidatedOrderLine line:lines)dao.createOrderItem(table.tenantId(),orderId,line);
+  dao.createOrderItems(table.tenantId(),orderId,lines);
   events.publishAfterCommit(RealtimeEvent.orderChanged("ORDER_CREATED",table.tenantId(),table.branchId(),orderId));
   return new OrderReceipt(orderId,orderNumber,table.displayName(),total,"NEW");
  }

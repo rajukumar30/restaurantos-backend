@@ -47,6 +47,20 @@ class OrderQueryServiceImplTest {
   assertThrows(ResponseStatusException.class,()->service.list(tenant,branch,auth));
   verify(dao,never()).list(any(),any());
  }
+ @Test void liveQueueRetainsAllAuthorizationChecks(){
+  UUID tenant=UUID.randomUUID(),branch=UUID.randomUUID();
+  service.listLive(tenant,branch,auth);
+  verify(access).requirePermission(auth,tenant,branch,"orders:read");
+  verify(access).requireBranchInTenant(tenant,branch);
+  verify(features).require(tenant,"GUEST_ORDERING");
+  verify(dao).listLive(tenant,branch);
+ }
+ @Test void liveQueueDeniesDisabledFeature(){
+  UUID tenant=UUID.randomUUID(),branch=UUID.randomUUID();
+  doThrow(new ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN)).when(features).require(tenant,"GUEST_ORDERING");
+  assertThrows(ResponseStatusException.class,()->service.listLive(tenant,branch,auth));
+  verify(dao,never()).listLive(any(),any());
+ }
  @Test void scopesOrderListToTenantAndBranch(){
   UUID tenant=UUID.randomUUID(),branch=UUID.randomUUID();
   service.list(tenant,branch,auth);

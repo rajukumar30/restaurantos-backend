@@ -33,6 +33,13 @@ public class OrderQueryServiceImpl implements OrderQueryService {
   return dao.list(tenantId,branchId);
  }
  @Transactional(readOnly=true)
+ public List<OrderSummary> listLive(UUID tenantId,UUID branchId,Authentication auth){
+  access.requirePermission(auth,tenantId,branchId,"orders:read");
+  access.requireBranchInTenant(tenantId,branchId);
+  featureAccess.require(tenantId,"GUEST_ORDERING");
+  return dao.listLive(tenantId,branchId);
+ }
+ @Transactional(readOnly=true)
  public OrderSummary get(UUID tenantId,UUID branchId,UUID orderId,Authentication auth){
   access.requirePermission(auth,tenantId,branchId,"orders:read");
   access.requireBranchInTenant(tenantId,branchId);

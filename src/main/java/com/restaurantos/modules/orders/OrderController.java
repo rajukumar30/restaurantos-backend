@@ -41,6 +41,12 @@ public class OrderController {
         return ApiResponse.success("Orders loaded",orderQueries.list(tenantId,branchId,authentication));
     }
 
+    @GetMapping("/api/v1/tenants/{tenantId}/orders/live")
+    public ApiResponse<List<OrderSummary>> listLiveOrders(@PathVariable UUID tenantId,
+            @RequestParam UUID branchId,Authentication authentication){
+        return ApiResponse.success("Live orders loaded",orderQueries.listLive(tenantId,branchId,authentication));
+    }
+
     @GetMapping("/api/v1/tenants/{tenantId}/orders/{orderId}")
     public ApiResponse<OrderSummary> getOrder(@PathVariable UUID tenantId,
             @PathVariable UUID orderId,@RequestParam UUID branchId,Authentication authentication){
