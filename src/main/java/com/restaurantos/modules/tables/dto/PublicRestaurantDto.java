@@ -12,5 +12,7 @@ public final class PublicRestaurantDto {
  }
     public record MenuCategory(UUID id, String name, String description, int sortOrder, List<MenuItem> items) {}
     public record MenuItem(UUID id, String name, String description, java.math.BigDecimal price,
-                           String dietaryType, int prepTimeMinutes) {}
+                           String dietaryType, int prepTimeMinutes,String imageUrl) {
+ public MenuItem(UUID id,String name,String description,java.math.BigDecimal price,String dietaryType,int prepTimeMinutes){this(id,name,description,price,dietaryType,prepTimeMinutes,null);}
+ }
 }

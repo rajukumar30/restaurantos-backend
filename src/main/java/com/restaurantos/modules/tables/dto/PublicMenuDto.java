@@ -12,5 +12,7 @@ public final class PublicMenuDto {
  }
     public record PublicCategory(UUID id, String name, List<PublicItem> items) {}
     public record PublicItem(UUID id, String name, String description, java.math.BigDecimal price,
-                             String dietaryType, int prepTimeMinutes) {}
+                             String dietaryType, int prepTimeMinutes,String imageUrl) {
+ public PublicItem(UUID id,String name,String description,BigDecimal price,String dietaryType,int prepTimeMinutes){this(id,name,description,price,dietaryType,prepTimeMinutes,null);}
+ }
 }

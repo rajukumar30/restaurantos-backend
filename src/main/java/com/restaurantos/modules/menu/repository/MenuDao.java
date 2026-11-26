@@ -12,9 +12,10 @@ public class MenuDao {
   jdbc.query("""
    SELECT mi.id,mi.category_id,mi.name,mi.description,
           COALESCE(bmi.price_override,mi.base_price) AS price,
-          mi.dietary_type,mi.prep_time_minutes,bmi.is_available
+          mi.dietary_type,mi.prep_time_minutes,bmi.is_available, '/api/v1/public/menu/images/' || CAST(img.id AS text) AS image_url
    FROM menu_items mi JOIN branch_menu_items bmi
      ON bmi.tenant_id=mi.tenant_id AND bmi.menu_item_id=mi.id
+   LEFT JOIN menu_item_images img ON img.tenant_id=mi.tenant_id AND img.item_id=mi.id
    WHERE mi.tenant_id=? AND bmi.branch_id=? AND mi.is_active=TRUE
    ORDER BY mi.name
    """,rs->{
@@ -22,7 +23,7 @@ public class MenuDao {
     itemsByCategory.computeIfAbsent(categoryId,ignored->new ArrayList<>()).add(
      new MenuItem(rs.getObject("id",UUID.class),categoryId,rs.getString("name"),
       rs.getString("description"),rs.getBigDecimal("price"),rs.getString("dietary_type"),
-      rs.getInt("prep_time_minutes"),rs.getBoolean("is_available")));
+      rs.getInt("prep_time_minutes"),rs.getBoolean("is_available"),rs.getString("image_url")));
    },tenantId,branchId);
   return jdbc.query("""
    SELECT id,name,description,sort_order,is_active FROM menu_categories
@@ -58,5 +59,28 @@ public class MenuDao {
    UPDATE branch_menu_items SET price_override=?,is_available=?,updated_at=NOW()
    WHERE tenant_id=? AND branch_id=? AND menu_item_id=?
    """,request.price(),request.available(),tenantId,branchId,itemId);
+ }
+ public boolean assignedItemExists(UUID tenantId,UUID branchId,UUID itemId){
+  return Boolean.TRUE.equals(jdbc.queryForObject("""
+   SELECT EXISTS(SELECT 1 FROM menu_items mi JOIN branch_menu_items bmi ON bmi.tenant_id=mi.tenant_id AND bmi.menu_item_id=mi.id
+    WHERE mi.tenant_id=? AND bmi.branch_id=? AND mi.id=? AND mi.is_active=TRUE)
+   """,Boolean.class,tenantId,branchId,itemId));
+ }
+ public String storeImage(UUID tenantId,UUID itemId,byte[] bytes){
+  UUID id=UUID.randomUUID();
+  jdbc.update("""
+   INSERT INTO menu_item_images(id,tenant_id,item_id,image_bytes) VALUES(?,?,?,?)
+   ON CONFLICT(item_id) DO UPDATE SET id=EXCLUDED.id,image_bytes=EXCLUDED.image_bytes WHERE menu_item_images.tenant_id=EXCLUDED.tenant_id
+   """,id,tenantId,itemId,bytes);return "/api/v1/public/menu/images/"+id;
+ }
+ public void removeImage(UUID tenantId,UUID itemId){jdbc.update("DELETE FROM menu_item_images WHERE tenant_id=? AND item_id=?",tenantId,itemId);}
+ public Optional<byte[]> publicImage(UUID id){
+  return jdbc.query("""
+   SELECT img.image_bytes FROM menu_item_images img JOIN tenants t ON t.id=img.tenant_id AND t.status='ACTIVE'
+   JOIN menu_items mi ON mi.tenant_id=img.tenant_id AND mi.id=img.item_id AND mi.is_active=TRUE
+   JOIN menu_categories mc ON mc.tenant_id=mi.tenant_id AND mc.id=mi.category_id AND mc.is_active=TRUE
+   WHERE img.id=? AND EXISTS(SELECT 1 FROM branch_menu_items bmi JOIN branches b ON b.id=bmi.branch_id AND b.tenant_id=bmi.tenant_id
+     WHERE bmi.tenant_id=mi.tenant_id AND bmi.menu_item_id=mi.id AND b.status='ACTIVE')
+   """,(rs,row)->rs.getBytes(1),id).stream().findFirst();
  }
 }

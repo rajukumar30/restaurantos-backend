@@ -23,7 +23,10 @@ public final class MenuDto {
                                boolean active, List<MenuItem> items) {}
     public record MenuItem(UUID id, UUID categoryId, String name, String description,
                            BigDecimal price, String dietaryType, int prepTimeMinutes,
-                           boolean available) {}
+                           boolean available, String imageUrl) {
+ public MenuItem(UUID id,UUID categoryId,String name,String description,BigDecimal price,String dietaryType,int prepTimeMinutes,boolean available){this(id,categoryId,name,description,price,dietaryType,prepTimeMinutes,available,null);}
+ }
+    public record ImageUpdated(UUID itemId,String imageUrl) {}
     public record CategoryCreated(UUID id, String name) {}
     public record ItemCreated(UUID id, UUID categoryId, String name, BigDecimal price, String dietaryType) {}
     public record ItemUpdated(UUID id, BigDecimal price, boolean available) {}

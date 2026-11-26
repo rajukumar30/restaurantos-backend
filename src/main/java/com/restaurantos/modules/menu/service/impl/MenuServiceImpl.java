@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import java.util.*;
+import com.restaurantos.common.image.ImageOptimizer;
+import org.springframework.web.multipart.MultipartFile;
 @Service
 public class MenuServiceImpl implements MenuService {
  private final MenuDao dao;
@@ -53,4 +55,29 @@ public class MenuServiceImpl implements MenuService {
    throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Menu item is not assigned to this branch.");
   return new ItemUpdated(itemId,request.price(),request.available());
  }
+ @Transactional
+ public ItemCreated createItemWithImage(UUID tenantId,CreateMenuItemRequest request,MultipartFile image,Authentication auth){
+  authorize(auth,tenantId,request.branchId(),"menu:manage");
+  var optimized=ImageOptimizer.optimize(image,ImageOptimizer.Kind.ITEM);
+  ItemCreated created=createItem(tenantId,request,auth);
+  dao.storeImage(tenantId,created.id(),optimized.bytes());
+  return created;
+ }
+ @Transactional
+ public ImageUpdated replaceImage(UUID tenantId,UUID branchId,UUID itemId,MultipartFile image,Authentication auth){
+  authorize(auth,tenantId,branchId,"menu:manage");
+  requireItem(tenantId,branchId,itemId);
+  var optimized=ImageOptimizer.optimize(image,ImageOptimizer.Kind.ITEM);
+  return new ImageUpdated(itemId,dao.storeImage(tenantId,itemId,optimized.bytes()));
+ }
+ @Transactional
+ public ImageUpdated removeImage(UUID tenantId,UUID branchId,UUID itemId,Authentication auth){
+  authorize(auth,tenantId,branchId,"menu:manage");requireItem(tenantId,branchId,itemId);
+  dao.removeImage(tenantId,itemId);return new ImageUpdated(itemId,null);
+ }
+ private void requireItem(UUID tenantId,UUID branchId,UUID itemId){
+  if(!dao.assignedItemExists(tenantId,branchId,itemId))throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Menu item not found in this branch.");
+ }
+ @Transactional(readOnly=true)
+ public Optional<byte[]> publicImage(UUID id){return dao.publicImage(id);}
 }
