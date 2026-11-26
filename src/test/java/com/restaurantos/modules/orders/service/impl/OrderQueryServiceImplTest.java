@@ -113,4 +113,22 @@ class OrderQueryServiceImplTest {
   assertThrows(ResponseStatusException.class,()->service.workspace(tenant,new OrderWorkspaceQuery(branch,null,"live","ALL","",1,20),auth));
   verifyNoInteractions(dao);
  }
+ @Test void historyWithoutDateIncludesAllDates(){
+  UUID tenant=UUID.randomUUID(),branch=UUID.randomUUID();
+  ZoneId zone=ZoneId.of("Asia/Kolkata");
+  when(dao.branchTimezone(tenant,branch)).thenReturn(zone.getId());
+  var query=new OrderWorkspaceQuery(branch,null,"history","ALL","",1,20);
+  service.workspace(tenant,query,auth);
+  verify(dao).workspace(eq(tenant),eq(query),isNull(),any(LocalDate.class),eq(zone));
+  verify(access).requirePermission(auth,tenant,branch,"orders:read");
+ }
+ @Test void historyCanBeRestrictedToSpecificDate(){
+  UUID tenant=UUID.randomUUID(),branch=UUID.randomUUID();
+  ZoneId zone=ZoneId.of("Asia/Kolkata");
+  when(dao.branchTimezone(tenant,branch)).thenReturn(zone.getId());
+  LocalDate date=LocalDate.of(2025,1,2);
+  var query=new OrderWorkspaceQuery(branch,date,"history","SERVED","rice",2,20);
+  service.workspace(tenant,query,auth);
+  verify(dao).workspace(eq(tenant),eq(query),eq(date),any(LocalDate.class),eq(zone));
+ }
 }

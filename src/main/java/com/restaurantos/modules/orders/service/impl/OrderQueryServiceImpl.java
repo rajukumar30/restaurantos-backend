@@ -44,12 +44,12 @@ public class OrderQueryServiceImpl implements OrderQueryService {
  public OrderWorkspacePage workspace(UUID tenantId,OrderWorkspaceQuery q,Authentication auth){
   access.requirePermission(auth,tenantId,q.branchId(),"orders:read");
   access.requireBranchInTenant(tenantId,q.branchId());featureAccess.require(tenantId,"GUEST_ORDERING");
-  if(!Set.of("day","live").contains(q.mode())||!Set.of("ALL","NEW","ACCEPTED","PREPARING","READY","SERVED","CANCELLED").contains(q.status())||q.search().length()>120||q.page()<1||q.page()>100000||q.size()<1||q.size()>50)
+  if(!Set.of("day","live","history").contains(q.mode())||!Set.of("ALL","NEW","ACCEPTED","PREPARING","READY","SERVED","CANCELLED").contains(q.status())||q.search().length()>120||q.page()<1||q.page()>100000||q.size()<1||q.size()>50)
    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid order filters.");
   ZoneId zone;
   try{zone=ZoneId.of(dao.branchTimezone(tenantId,q.branchId()));}catch(java.time.DateTimeException e){throw new ResponseStatusException(HttpStatus.CONFLICT,"Branch timezone is invalid. Contact your administrator.");}
-  LocalDate today=LocalDate.now(zone),date=q.date()==null?today:q.date();
-  if(date.isAfter(today)||date.getYear()<2000)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Select a valid past or current date.");
+  LocalDate today=LocalDate.now(zone),date="live".equals(q.mode())?today:"history".equals(q.mode())?q.date():q.date()==null?today:q.date();
+  if(date!=null&&(date.isAfter(today)||date.getYear()<2000))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Select a valid past or current date.");
   return dao.workspace(tenantId,q,date,today,zone);
  }
  @Transactional(readOnly=true)

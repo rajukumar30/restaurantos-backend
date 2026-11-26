@@ -91,11 +91,11 @@ public class OrderQueryDao {
   return jdbc.queryForObject("SELECT timezone FROM branches WHERE tenant_id=? AND id=?",String.class,tenant,branch);
  }
  public OrderWorkspacePage workspace(UUID tenant,OrderWorkspaceQuery q,LocalDate date,LocalDate today,ZoneId zone){
-  Timestamp start=Timestamp.from(date.atStartOfDay(zone).toInstant()),end=Timestamp.from(date.plusDays(1).atStartOfDay(zone).toInstant());
+  boolean dateScoped=date!=null&&!"live".equals(q.mode());
   Timestamp todayStart=Timestamp.from(today.atStartOfDay(zone).toInstant());
   boolean live="live".equals(q.mode());
-  String scope=" FROM restaurant_orders o WHERE o.tenant_id=? AND o.branch_id=? AND "+(live?ACTIVE:"o.created_at>=? AND o.created_at<?");
-  var scopeArgs=new ArrayList<Object>(List.of(tenant,q.branchId()));if(!live){scopeArgs.add(start);scopeArgs.add(end);}
+  String scope=" FROM restaurant_orders o WHERE o.tenant_id=? AND o.branch_id=?"+(live?" AND "+ACTIVE:dateScoped?" AND o.created_at>=? AND o.created_at<?":"");
+  var scopeArgs=new ArrayList<Object>(List.of(tenant,q.branchId()));if(dateScoped){scopeArgs.add(Timestamp.from(date.atStartOfDay(zone).toInstant()));scopeArgs.add(Timestamp.from(date.plusDays(1).atStartOfDay(zone).toInstant()));}
   Map<String,Long> counts=new LinkedHashMap<>();
   jdbc.query("SELECT o.status,COUNT(*) AS n "+scope+" GROUP BY o.status",rs->{counts.put(rs.getString("status"),rs.getLong("n"));},scopeArgs.toArray());
   counts.put("ALL",counts.values().stream().mapToLong(Long::longValue).sum());
