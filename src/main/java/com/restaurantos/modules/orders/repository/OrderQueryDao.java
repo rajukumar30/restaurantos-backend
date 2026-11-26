@@ -3,6 +3,8 @@ import com.restaurantos.modules.orders.dto.OrderDto.*;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import java.util.*;
+import java.time.*;
+import java.sql.Timestamp;
 @Repository
 public class OrderQueryDao {
  private final JdbcTemplate jdbc;
@@ -83,5 +85,46 @@ public class OrderQueryDao {
    INSERT INTO restaurant_order_service_events(tenant_id,branch_id,order_id,actor_id,event_type)
    VALUES(?,?,?,?,?)
    """,tenantId,branchId,orderId,actorId,"WAITER_CONFIRMED_SERVED");
+ }
+ private static final String ACTIVE="o.status IN ('NEW','ACCEPTED','PREPARING','READY')";
+ public String branchTimezone(UUID tenant,UUID branch){
+  return jdbc.queryForObject("SELECT timezone FROM branches WHERE tenant_id=? AND id=?",String.class,tenant,branch);
+ }
+ public OrderWorkspacePage workspace(UUID tenant,OrderWorkspaceQuery q,LocalDate date,LocalDate today,ZoneId zone){
+  Timestamp start=Timestamp.from(date.atStartOfDay(zone).toInstant()),end=Timestamp.from(date.plusDays(1).atStartOfDay(zone).toInstant());
+  Timestamp todayStart=Timestamp.from(today.atStartOfDay(zone).toInstant());
+  boolean live="live".equals(q.mode());
+  String scope=" FROM restaurant_orders o WHERE o.tenant_id=? AND o.branch_id=? AND "+(live?ACTIVE:"o.created_at>=? AND o.created_at<?");
+  var scopeArgs=new ArrayList<Object>(List.of(tenant,q.branchId()));if(!live){scopeArgs.add(start);scopeArgs.add(end);}
+  Map<String,Long> counts=new LinkedHashMap<>();
+  jdbc.query("SELECT o.status,COUNT(*) AS n "+scope+" GROUP BY o.status",rs->{counts.put(rs.getString("status"),rs.getLong("n"));},scopeArgs.toArray());
+  counts.put("ALL",counts.values().stream().mapToLong(Long::longValue).sum());
+  long[] active=jdbc.queryForObject("SELECT COUNT(*) AS active_count,COUNT(*) FILTER(WHERE o.created_at<?) AS older_count FROM restaurant_orders o WHERE o.tenant_id=? AND o.branch_id=? AND "+ACTIVE,(rs,row)->new long[]{rs.getLong("active_count"),rs.getLong("older_count")},todayStart,tenant,q.branchId());
+  var where=new StringBuilder(scope);var args=new ArrayList<>(scopeArgs);
+  if(!"ALL".equals(q.status())){where.append(" AND o.status=?");args.add(q.status());}
+  String search=q.search().trim();
+  if(!search.isEmpty()){
+   where.append("""
+    AND (strpos(lower(o.order_number),lower(?))>0
+    OR EXISTS(SELECT 1 FROM restaurant_tables rt WHERE rt.tenant_id=o.tenant_id AND rt.id=o.table_id AND strpos(lower(rt.display_name),lower(?))>0)
+    OR EXISTS(SELECT 1 FROM restaurant_order_items oi WHERE oi.tenant_id=o.tenant_id AND oi.order_id=o.id AND strpos(lower(oi.item_name),lower(?))>0))
+    """);args.add(search);args.add(search);args.add(search);
+  }
+  long total=jdbc.queryForObject("SELECT COUNT(*) "+where,Long.class,args.toArray());
+  int page=Math.min(q.page(),Math.max(1,(int)Math.ceil((double)total/q.size())));
+  args.add(q.size());args.add((long)(page-1)*q.size());
+  // First select the bounded page; only aggregate line items for those orders.
+  var items=jdbc.query("""
+   SELECT o.id,o.order_number,o.status,o.total_amount,o.created_at,rt.display_name AS table_name,
+    COUNT(oi.id) AS line_count,COALESCE(SUM(oi.quantity),0) AS item_count,
+    COALESCE(string_agg(oi.item_name || ' × ' || oi.quantity,', ' ORDER BY oi.created_at),'') AS items_summary
+   FROM (SELECT o.id,o.tenant_id,o.table_id,o.order_number,o.status,o.total_amount,o.created_at
+   """+where+" ORDER BY o.created_at DESC,o.id DESC LIMIT ? OFFSET ?) o "+"""
+   JOIN restaurant_tables rt ON rt.tenant_id=o.tenant_id AND rt.id=o.table_id
+   LEFT JOIN restaurant_order_items oi ON oi.tenant_id=o.tenant_id AND oi.order_id=o.id
+   GROUP BY o.id,o.order_number,o.status,o.total_amount,o.created_at,rt.display_name
+   ORDER BY o.created_at DESC,o.id DESC
+   """,(rs,row)->new OrderSummary(rs.getObject("id",UUID.class),rs.getString("order_number"),rs.getString("table_name"),rs.getString("status"),rs.getBigDecimal("total_amount"),rs.getInt("line_count"),rs.getInt("item_count"),rs.getString("items_summary"),rs.getTimestamp("created_at").toInstant()),args.toArray());
+  return new OrderWorkspacePage(date,today,zone.getId(),q.mode(),counts,active[0],active[1],items,total,page,q.size());
  }
 }

@@ -19,4 +19,7 @@ public final class OrderDto {
                                java.time.Instant createdAt) {}
     public record OrderStatusUpdated(UUID orderId, String status) {}
 
+ public record OrderWorkspaceQuery(UUID branchId,java.time.LocalDate date,String mode,String status,String search,int page,int size){}
+ public record OrderWorkspacePage(java.time.LocalDate date,java.time.LocalDate today,String timezone,String mode,
+  Map<String,Long> counts,long activeQueue,long olderActive,List<OrderSummary> items,long total,int page,int size){}
 }

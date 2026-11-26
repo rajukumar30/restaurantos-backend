@@ -10,6 +10,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.UUID;
+import java.time.LocalDate;
+import org.springframework.format.annotation.DateTimeFormat;
 
 @RestController
 public class OrderController {
@@ -45,6 +47,15 @@ public class OrderController {
     public ApiResponse<List<OrderSummary>> listLiveOrders(@PathVariable UUID tenantId,
             @RequestParam UUID branchId,Authentication authentication){
         return ApiResponse.success("Live orders loaded",orderQueries.listLive(tenantId,branchId,authentication));
+    }
+
+    @GetMapping("/api/v1/tenants/{tenantId}/orders/workspace")
+    public ApiResponse<OrderWorkspacePage> workspace(@PathVariable UUID tenantId,@RequestParam UUID branchId,
+     @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate date,
+     @RequestParam(defaultValue="day") String mode,@RequestParam(defaultValue="ALL") String status,
+     @RequestParam(defaultValue="") String search,@RequestParam(defaultValue="1") int page,
+     @RequestParam(defaultValue="20") int size,Authentication authentication){
+     return ApiResponse.success("Order workspace loaded",orderQueries.workspace(tenantId,new OrderWorkspaceQuery(branchId,date,mode,status,search,page,size),authentication));
     }
 
     @GetMapping("/api/v1/tenants/{tenantId}/orders/{orderId}")
