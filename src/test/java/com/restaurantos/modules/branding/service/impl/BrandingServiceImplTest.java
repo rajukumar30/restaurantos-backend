@@ -16,7 +16,7 @@ class BrandingServiceImplTest {
  private final Authentication auth=mock(Authentication.class);
  @Test void defaultMatchesPanelPalette(){
   var s=BrandingSettings.defaults("Restaurant");
-  assertEquals("#1B241F",s.primaryColor());assertEquals("#E7764C",s.accentColor());assertEquals("#F7F7F4",s.backgroundColor());
+  assertEquals("#213D32",s.primaryColor());assertEquals("#B64D32",s.accentColor());assertEquals("#FAF7F2",s.backgroundColor());
  }
  @Test void rejectsUnauthorizedTenantBeforeWrite(){
   when(auth.getPrincipal()).thenReturn(user);

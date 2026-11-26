@@ -30,7 +30,9 @@ public record BrandingSettings(
  }
  public static BrandingSettings legacy(String name,String slogan,String logo,String banner,String theme){
   String selected=theme!=null&&Set.of("CLASSIC","BOLD","MINIMAL").contains(theme)?theme:"CLASSIC";
-  String primary=switch(selected){case "BOLD"->"#A54225";case "MINIMAL"->"#3D4540";default->"#1B241F";};
-  return new BrandingSettings(name,slogan,logo,banner,selected,primary,"#E7764C","#F7F7F4","","","","","","",true,true,true);
+  String primary=switch(selected){case "BOLD"->"#7C2F20";case "MINIMAL"->"#303632";default->"#213D32";};
+  String accent=switch(selected){case "BOLD"->"#E79B58";case "MINIMAL"->"#397758";default->"#B64D32";};
+  String background=switch(selected){case "BOLD"->"#FFF4E6";case "MINIMAL"->"#FFFFFF";default->"#FAF7F2";};
+  return new BrandingSettings(name,slogan,logo,banner,selected,primary,accent,background,"","","","","","",true,true,true);
  }
 }
