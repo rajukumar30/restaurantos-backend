@@ -38,4 +38,13 @@ class BrandingServiceImplTest {
   var settings=BrandingSettings.defaults("Restaurant").withImages("javascript:alert(1)","");
   assertThrows(ResponseStatusException.class,()->service.publish(tenant,settings,auth));verify(dao,never()).publish(any(),any());
  }
+ @Test void nonOwnerCannotReadEditorOrPublishPhotos(){
+  when(auth.getPrincipal()).thenReturn(user);
+  when(dao.canManage(tenant,user)).thenReturn(false);
+  assertEquals(403,assertThrows(ResponseStatusException.class,()->service.get(tenant,auth)).getStatusCode().value());
+  assertEquals(403,assertThrows(ResponseStatusException.class,()->service.publishWithImages(tenant,BrandingSettings.defaults("Restaurant"),null,null,auth)).getStatusCode().value());
+  verify(dao,never()).get(any());verify(dao,never()).lockTenant(any());
+  verify(dao,never()).storeImage(any(),any(),any());verify(dao,never()).publish(any(),any());
+  verifyNoInteractions(features);
+ }
 }

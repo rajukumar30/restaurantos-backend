@@ -32,9 +32,7 @@ public class BrandingDao {
     JOIN role_permissions rp ON rp.role_id=r.id
     JOIN permissions p ON p.id=rp.permission_id
     WHERE tu.tenant_id=? AND tu.user_id=? AND tu.status='ACTIVE'
-      AND ((r.role_key='OWNER' AND ur.branch_id IS NULL) OR
-        (r.role_key='MANAGER' AND (ur.branch_id IS NULL OR EXISTS (
-         SELECT 1 FROM branches b WHERE b.id=ur.branch_id AND b.tenant_id=tu.tenant_id AND b.status='ACTIVE'))))
+      AND r.role_key='OWNER' AND ur.branch_id IS NULL
       AND p.permission_key='menu:manage')
    """,Boolean.class,tenantId,userId));
  }

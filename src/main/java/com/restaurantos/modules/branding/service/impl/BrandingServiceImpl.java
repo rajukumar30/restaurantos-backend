@@ -24,7 +24,7 @@ public class BrandingServiceImpl implements BrandingService {
   if(auth==null||!(auth.getPrincipal() instanceof UUID userId))
    throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"Sign in required.");
   if(!dao.canManage(tenantId,userId))
-   throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Active owner or manager access with menu management permission is required to customize the guest website.");
+   throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Only the restaurant owner can customize the guest website.");
   features.require(tenantId,"QR_MENU");
  }
  @Transactional(readOnly=true)
