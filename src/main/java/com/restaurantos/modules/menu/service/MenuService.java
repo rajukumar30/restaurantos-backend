@@ -12,4 +12,9 @@ public interface MenuService {
  ImageUpdated replaceImage(UUID tenantId,UUID branchId,UUID itemId,MultipartFile image,Authentication auth);
  ImageUpdated removeImage(UUID tenantId,UUID branchId,UUID itemId,Authentication auth);
  Optional<byte[]> publicImage(UUID id,boolean thumbnail);
+ CatalogPage catalog(UUID tenantId,CatalogQuery query,Authentication auth);
+ ItemUpdated edit(UUID tenantId,UUID itemId,CreateMenuItemRequest request,MultipartFile image,boolean removeImage,Authentication auth);
+ ItemUpdated availability(UUID tenantId,UUID itemId,AvailabilityRequest request,Authentication auth);
+ ItemCreated duplicate(UUID tenantId,UUID branchId,UUID itemId,Authentication auth);
+ BulkResult bulk(UUID tenantId,BulkRequest request,Authentication auth);
 }
