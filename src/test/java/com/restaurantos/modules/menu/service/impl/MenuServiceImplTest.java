@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
-import java.util.UUID;
+import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 class MenuServiceImplTest {
@@ -50,5 +50,48 @@ class MenuServiceImplTest {
   verify(access).requirePermission(auth,tenant,branch,"menu:read");
   verify(access).requireBranchInTenant(tenant,branch);
   verify(dao).findMenu(tenant,branch);
+ }
+ @Test void rejectsInvalidCatalogueFiltersBeforeQuery(){
+  UUID tenant=UUID.randomUUID(),branch=UUID.randomUUID();
+  var query=new CatalogQuery(branch,"",null,"all","all","all",null,null,"name; DROP TABLE menu_items",false,1,25);
+  assertThrows(ResponseStatusException.class,()->service.catalog(tenant,query,auth));
+  verify(dao,never()).catalog(any(),any());
+ }
+ @Test void paginatedCatalogueUsesReadPermission(){
+  UUID tenant=UUID.randomUUID(),branch=UUID.randomUUID();
+  var query=new CatalogQuery(branch,"paneer",null,"sold-out","VEG","no",null,null,"price-low",true,1,25);
+  service.catalog(tenant,query,auth);
+  verify(access).requirePermission(auth,tenant,branch,"menu:read");verify(dao).catalog(tenant,query);
+ }
+ @Test void sharedEditDeniesUnauthorizedOtherBranchBeforeWrite(){
+  UUID tenant=UUID.randomUUID(),branch=UUID.randomUUID(),other=UUID.randomUUID(),item=UUID.randomUUID();
+  when(dao.assignedItemExists(tenant,branch,item)).thenReturn(true);
+  when(dao.assignedBranches(tenant,item)).thenReturn(List.of(branch,other));
+  doThrow(new ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN)).when(access).requirePermission(auth,tenant,other,"menu:manage");
+  var request=new CreateMenuItemRequest(branch,UUID.randomUUID(),"Rice",null,new BigDecimal("120"),"VEG",15,true);
+  assertThrows(ResponseStatusException.class,()->service.edit(tenant,item,request,null,false,auth));
+  verify(dao,never()).editDefinition(any(),any(),any(),any());verifyNoInteractions(events);
+ }
+ @Test void bulkValidatesAllItemsBeforeAnyMutation(){
+  UUID tenant=UUID.randomUUID(),branch=UUID.randomUUID(),first=UUID.randomUUID(),second=UUID.randomUUID();
+  when(dao.assignedItemExists(tenant,branch,first)).thenReturn(true);
+  assertThrows(ResponseStatusException.class,()->service.bulk(tenant,new BulkRequest(branch,List.of(first,second),"sold-out",null),auth));
+  verify(dao,never()).setAvailable(any(),any(),any(),anyBoolean());
+ }
+ @Test void bulkDeduplicatesSelectionAndUsesOneBranchNotification(){
+  UUID tenant=UUID.randomUUID(),branch=UUID.randomUUID(),item=UUID.randomUUID();
+  when(dao.assignedItemExists(tenant,branch,item)).thenReturn(true);
+  when(dao.setAvailable(tenant,branch,item,false)).thenReturn(1);
+  assertEquals(1,service.bulk(tenant,new BulkRequest(branch,List.of(item,item),"sold-out",null),auth).updated());
+  verify(dao).setAvailable(tenant,branch,item,false);verify(events).publishMenuAfterCommit(any());
+ }
+ @Test void duplicateStartsUnavailable(){
+  UUID tenant=UUID.randomUUID(),branch=UUID.randomUUID(),item=UUID.randomUUID(),cat=UUID.randomUUID();
+  var source=new CatalogItem(item,cat,"Starters","Soup",null,new BigDecimal("99"),"VEG",10,true,null);
+  when(dao.catalogItem(tenant,branch,item)).thenReturn(Optional.of(source));
+  when(dao.activeCategoryExists(tenant,cat)).thenReturn(true);
+  var copy=service.duplicate(tenant,branch,item,auth);
+  assertNotEquals(item,copy.id());assertEquals("Soup (copy)",copy.name());
+  verify(dao).setAvailable(tenant,branch,copy.id(),false);verify(dao).copyPhoto(tenant,item,copy.id());
  }
 }
