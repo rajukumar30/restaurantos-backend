@@ -31,19 +31,27 @@ public final class ImageOptimizer {
     reader.setInput(input,true,true);format=reader.getFormatName();
     if(!("JPEG".equalsIgnoreCase(format)||"PNG".equalsIgnoreCase(format)))throw new IOException("Unsupported format");
     int w=reader.getWidth(0),h=reader.getHeight(0);
-    if(w!=kind.width||h!=kind.height)throw bad("Image must be "+kind.width+" × "+kind.height+" pixels. Crop it before uploading.");
+    if(kind==Kind.LOGO ? w!=h||w<128||w>512 : w!=kind.width||h!=kind.height)throw bad(kind==Kind.LOGO?"Logo must be square, 128–512 pixels.":("Image must be "+kind.width+" × "+kind.height+" pixels. Crop it before uploading."));
     image=reader.read(0);
    }finally{reader.dispose();}
    if(kind==Kind.LOGO){
     // Re-encode PNG to preserve alpha and remove metadata. JPEG logos remain JPEG.
     if("PNG".equalsIgnoreCase(format)){
-     var out=new ByteArrayOutputStream();
-     if(ImageIO.write(image,"PNG",out)&&out.size()<=kind.maxBytes)return new Image(out.toByteArray(),"image/png");
-     throw bad("Logo exceeds 120 KB. Choose a simpler logo or compress it further.");
+     // Preserve transparency and use the largest square raster within the database cap.
+     for(int size:new int[]{image.getWidth(),384,320,256,192,128}){
+      if(size>image.getWidth())continue;
+      BufferedImage scaled=new BufferedImage(size,size,BufferedImage.TYPE_INT_ARGB);
+      Graphics2D g=scaled.createGraphics();
+      try{g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,RenderingHints.VALUE_INTERPOLATION_BICUBIC);g.drawImage(image,0,0,size,size,null);}finally{g.dispose();}
+      var out=new ByteArrayOutputStream();
+      if(ImageIO.write(scaled,"PNG",out)&&out.size()<=kind.maxBytes)return new Image(out.toByteArray(),"image/png");
+     }
+     throw bad("Unable to optimize logo. Please select a valid image.");
     }
    }
-   BufferedImage rgb=new BufferedImage(kind.width,kind.height,BufferedImage.TYPE_INT_RGB);
-   Graphics2D graphics=rgb.createGraphics();try{graphics.setColor(Color.WHITE);graphics.fillRect(0,0,kind.width,kind.height);graphics.drawImage(image,0,0,null);}finally{graphics.dispose();}
+   int width=kind==Kind.LOGO?image.getWidth():kind.width,height=kind==Kind.LOGO?image.getHeight():kind.height;
+   BufferedImage rgb=new BufferedImage(width,height,BufferedImage.TYPE_INT_RGB);
+   Graphics2D graphics=rgb.createGraphics();try{graphics.setColor(Color.WHITE);graphics.fillRect(0,0,width,height);graphics.drawImage(image,0,0,null);}finally{graphics.dispose();}
    for(float quality:new float[]{.83f,.72f,.60f,.48f,.36f,.25f}){
     byte[] bytes=jpeg(rgb,quality);
     if(bytes.length<=kind.maxBytes)return new Image(bytes,"image/jpeg");

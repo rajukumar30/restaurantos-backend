@@ -27,6 +27,14 @@ class ImageOptimizerTest {
   assertEquals("image/png",img.contentType());assertTrue(img.bytes().length<=122880);
   assertEquals(0,ImageIO.read(new ByteArrayInputStream(img.bytes())).getRGB(0,0)>>>24);
  }
+ @Test void acceptsAdaptiveSquareLogoWithoutStretching()throws IOException{
+  var img=ImageOptimizer.optimize(photo(256,256,true),ImageOptimizer.Kind.LOGO);
+  var decoded=ImageIO.read(new ByteArrayInputStream(img.bytes()));
+  assertEquals(256,decoded.getWidth());assertEquals(256,decoded.getHeight());assertEquals(0,decoded.getRGB(0,0)>>>24);
+  assertTrue(img.bytes().length<=122880);
+  assertThrows(ResponseStatusException.class,()->ImageOptimizer.optimize(photo(256,192,true),ImageOptimizer.Kind.LOGO));
+  assertThrows(ResponseStatusException.class,()->ImageOptimizer.optimize(photo(640,640,true),ImageOptimizer.Kind.LOGO));
+ }
  @Test void rejectsWrongDimensionsAndCorruptData()throws IOException{
   assertThrows(ResponseStatusException.class,()->ImageOptimizer.optimize(photo(200,200,false),ImageOptimizer.Kind.ITEM));
   assertThrows(ResponseStatusException.class,()->ImageOptimizer.optimize(new MockMultipartFile("image","x.jpg","image/jpeg",new byte[]{1,2,3}),ImageOptimizer.Kind.ITEM));
