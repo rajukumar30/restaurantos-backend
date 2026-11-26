@@ -5,30 +5,37 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.web.server.ResponseStatusException;
 import java.util.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.restaurantos.modules.branding.repository.BrandingDao;
+import com.restaurantos.modules.branding.dto.BrandingSettings;
 @Repository
 public class PublicQrMenuDao {
  private final JdbcTemplate jdbc;
- public PublicQrMenuDao(JdbcTemplate jdbc){this.jdbc=jdbc;}
+ private final ObjectMapper mapper;
+ public PublicQrMenuDao(JdbcTemplate jdbc,ObjectMapper mapper){this.jdbc=jdbc;this.mapper=mapper;}
+ private record ResolvedTable(UUID tenantId,PublicMenu menu){}
  public PublicMenu resolve(String qrToken){
-        List<PublicMenu> matches = jdbc.query("""
+        List<ResolvedTable> matches = jdbc.query("""
                 SELECT rt.id AS table_id, rt.display_name AS table_name,
                        b.id AS branch_id, b.name AS branch_name, t.name AS restaurant_name,
-                       rt.tenant_id, COALESCE(gb.slogan, '') AS slogan, COALESCE(gb.logo_url, '') AS logo_url, COALESCE(gb.banner_url, '') AS banner_url, COALESCE(gb.theme, 'CLASSIC') AS theme
+                       rt.tenant_id, %s
                 FROM restaurant_tables rt
                 JOIN branches b ON b.id = rt.branch_id AND b.tenant_id = rt.tenant_id
                 JOIN tenants t ON t.id = rt.tenant_id
                 LEFT JOIN restaurant_guest_branding gb ON gb.tenant_id = rt.tenant_id
                 WHERE rt.qr_token = ? AND rt.is_active = TRUE
                   AND b.status = 'ACTIVE' AND t.status = 'ACTIVE'
-                """, (rs, row) -> new PublicMenu(
+                """.formatted(BrandingDao.COLUMNS), (rs, row) -> {
+                BrandingSettings branding=BrandingDao.read(rs,mapper,rs.getString("restaurant_name"));
+                return new ResolvedTable(rs.getObject("tenant_id",UUID.class),new PublicMenu(
                 rs.getObject("table_id", UUID.class), rs.getString("table_name"),
                 rs.getObject("branch_id", UUID.class), rs.getString("branch_name"),
-                rs.getString("restaurant_name"), List.of(), rs.getString("slogan"), rs.getString("logo_url"), rs.getString("banner_url"), rs.getString("theme")), qrToken);
+                branding.displayName(), List.of(), branding.slogan(), branding.logoUrl(), branding.bannerUrl(), branding.theme(),branding));}, qrToken);
         if (matches.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "This table QR code is invalid or inactive.");
         }
-        PublicMenu table = matches.get(0);
-        UUID tenantId = jdbc.queryForObject("SELECT tenant_id FROM restaurant_tables WHERE qr_token = ?", UUID.class, qrToken);
+        PublicMenu table = matches.getFirst().menu();
+        UUID tenantId = matches.getFirst().tenantId();
         Map<UUID, List<PublicItem>> grouped = new LinkedHashMap<>();
         jdbc.query("""
                 SELECT mc.id AS category_id, mc.name AS category_name,
@@ -57,7 +64,7 @@ public class PublicQrMenuDao {
         }, tenantId);
         return new PublicMenu(
                 table.tableId(), table.tableName(), table.branchId(), table.branchName(),
-                table.restaurantName(), categories, table.slogan(), table.logoUrl(), table.bannerUrl(), table.theme());
+                table.restaurantName(), categories, table.slogan(), table.logoUrl(), table.bannerUrl(), table.theme(),table.branding());
     }
 
 }

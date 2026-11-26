@@ -5,21 +5,26 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.web.server.ResponseStatusException;
 import java.util.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.restaurantos.modules.branding.repository.BrandingDao;
+import com.restaurantos.modules.branding.dto.BrandingSettings;
 @Repository
 public class PublicRestaurantMenuDao {
  private final JdbcTemplate jdbc;
- public PublicRestaurantMenuDao(JdbcTemplate jdbc){this.jdbc=jdbc;}
+ private final ObjectMapper mapper;
+ public PublicRestaurantMenuDao(JdbcTemplate jdbc,ObjectMapper mapper){this.jdbc=jdbc;this.mapper=mapper;}
+ private record Restaurant(UUID id,String slug,BrandingSettings branding){}
  public RestaurantMenu getMenu(String slug,UUID branchId){
-        List<RestaurantHeader> restaurants = jdbc.query("""
-                SELECT t.id, t.name, t.slug
-                FROM tenants t
+        List<Restaurant> restaurants = jdbc.query("""
+                SELECT t.id, t.name, t.slug, %s
+                FROM tenants t LEFT JOIN restaurant_guest_branding gb ON gb.tenant_id=t.id
                 WHERE t.slug = ? AND t.status = 'ACTIVE'
-                """, (rs, row) -> new RestaurantHeader(
-                rs.getObject("id", UUID.class), rs.getString("name"), rs.getString("slug")), slug);
+                """.formatted(BrandingDao.COLUMNS), (rs, row) -> new Restaurant(
+                rs.getObject("id", UUID.class), rs.getString("slug"), BrandingDao.read(rs,mapper,rs.getString("name"))), slug);
         if (restaurants.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Restaurant not found or inactive.");
         }
-        RestaurantHeader restaurant = restaurants.get(0);
+        Restaurant restaurant = restaurants.getFirst();
 
         List<BranchSummary> branches = jdbc.query("""
                 SELECT id, name
@@ -66,8 +71,8 @@ public class PublicRestaurantMenuDao {
                     rs.getInt("sort_order"), itemsByCategory.getOrDefault(id, List.of()));
         }, restaurant.id());
 
-        return new RestaurantMenu(restaurant.name(), restaurant.slug(), branches, selectedBranch.id(),
-                        selectedBranch.name(), categories);
+        return new RestaurantMenu(restaurant.branding().displayName(), restaurant.slug(), branches, selectedBranch.id(),
+                        selectedBranch.name(), categories,restaurant.branding());
     }
 
 }
