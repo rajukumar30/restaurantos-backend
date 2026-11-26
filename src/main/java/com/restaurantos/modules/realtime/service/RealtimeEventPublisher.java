@@ -6,4 +6,5 @@ public interface RealtimeEventPublisher {
     void publishAfterCommit(RealtimeEvent event);
     void publishServiceRequestAfterCommit(RealtimeEvent event);
     void publishBillingAfterCommit(RealtimeEvent event);
+    void publishMenuAfterCommit(RealtimeEvent event);
 }

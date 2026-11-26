@@ -30,6 +30,7 @@ public class RealtimeChannelInterceptor implements ChannelInterceptor {
         "^/topic/tenants/([0-9a-fA-F-]{36})/branches/([0-9a-fA-F-]{36})/(orders|service-requests|billing)$");
     private static final Pattern GUEST_ORDER_TOPIC = Pattern.compile("^/topic/guest/orders/([0-9a-fA-F-]{36})$");
     private static final Pattern GUEST_SERVICE_TOPIC = Pattern.compile("^/topic/guest/tables/([0-9a-fA-F-]{36})/service-requests$");
+    private static final Pattern GUEST_MENU_TOPIC = Pattern.compile("^/topic/guest/branches/([0-9a-fA-F-]{36})/menu$");
     private final ServiceRequestDao serviceRequests;
     private final OrderQueryDao orders;
     private final JwtService jwt;
@@ -118,6 +119,15 @@ public class RealtimeChannelInterceptor implements ChannelInterceptor {
                 if (tables.isEmpty() || !tables.getFirst().id().equals(UUID.fromString(guestService.group(1)))
                         || !features.enabled(tables.getFirst().tenantId(), "SERVICE_REQUESTS"))
                     throw new SecurityException("Guest service subscription denied");
+                return message;
+            }
+            Matcher guestMenu = GUEST_MENU_TOPIC.matcher(destination == null ? "" : destination);
+            if (guestMenu.matches()) {
+                Object qr = headers.getSessionAttributes() == null ? null : headers.getSessionAttributes().get("guestQr");
+                if (!(qr instanceof String qrToken)) throw new SecurityException("Guest table authentication required");
+                var tables = serviceRequests.tables(qrToken);
+                if (tables.isEmpty() || !tables.getFirst().branchId().equals(UUID.fromString(guestMenu.group(1))))
+                    throw new SecurityException("Guest menu subscription denied");
                 return message;
             }
             Principal principal = headers.getUser();

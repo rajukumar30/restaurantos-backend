@@ -10,12 +10,16 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import java.util.*;
 import com.restaurantos.common.image.ImageOptimizer;
+import com.restaurantos.modules.realtime.dto.RealtimeEvent;
+import com.restaurantos.modules.realtime.service.RealtimeEventPublisher;
+import java.time.Instant;
 import org.springframework.web.multipart.MultipartFile;
 @Service
 public class MenuServiceImpl implements MenuService {
  private final MenuDao dao;
  private final TenantAccessService access;
- public MenuServiceImpl(MenuDao dao,TenantAccessService access){this.dao=dao;this.access=access;}
+ private final RealtimeEventPublisher events;
+ public MenuServiceImpl(MenuDao dao,TenantAccessService access,RealtimeEventPublisher events){this.dao=dao;this.access=access;this.events=events;}
  private void authorize(Authentication auth,UUID tenantId,UUID branchId,String permission){
   access.requirePermission(auth,tenantId,branchId,permission);
   access.requireBranchInTenant(tenantId,branchId);
@@ -53,6 +57,7 @@ public class MenuServiceImpl implements MenuService {
   authorize(auth,tenantId,request.branchId(),"menu:manage");
   if(dao.updateBranchItem(tenantId,request.branchId(),itemId,request)==0)
    throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Menu item is not assigned to this branch.");
+  events.publishMenuAfterCommit(new RealtimeEvent(UUID.randomUUID(),"MENU_ITEM_UPDATED",tenantId,request.branchId(),itemId,1,Instant.now(),Map.of("available",Boolean.toString(request.available()),"price",request.price().toPlainString())));
   return new ItemUpdated(itemId,request.price(),request.available());
  }
  @Transactional

@@ -33,6 +33,9 @@ public class RealtimeEventPublisherImpl implements RealtimeEventPublisher {
         publish(event, "billing");
     }
 
+    @Override
+    public void publishMenuAfterCommit(RealtimeEvent event) { publish(event, "menu"); }
+
     private void publish(RealtimeEvent event, String topic) {
         if (!TransactionSynchronizationManager.isActualTransactionActive()
                 || !TransactionSynchronizationManager.isSynchronizationActive())
@@ -43,6 +46,9 @@ public class RealtimeEventPublisherImpl implements RealtimeEventPublisher {
                 try {
                     messaging.convertAndSend("/topic/tenants/" + event.tenantId()
                             + "/branches/" + event.branchId() + "/" + topic, event);
+                    if ("menu".equals(topic)) {
+                        messaging.convertAndSend("/topic/guest/branches/" + event.branchId() + "/menu", event);
+                    }
                     if ("service-requests".equals(topic) && event.payload().containsKey("tableId")) {
                         messaging.convertAndSend("/topic/guest/tables/" + event.payload().get("tableId") + "/service-requests", event);
                     }

@@ -45,20 +45,20 @@ public class PublicRestaurantMenuDao {
         jdbc.query("""
                 SELECT mi.id, mi.category_id, mi.name, mi.description,
                        COALESCE(bmi.price_override, mi.base_price) AS price,
-                       mi.dietary_type, mi.prep_time_minutes, '/api/v1/public/menu/images/' || CAST(img.id AS text) AS image_url
+                       mi.dietary_type, mi.prep_time_minutes, bmi.is_available, '/api/v1/public/menu/images/' || CAST(img.id AS text) AS image_url
                 FROM menu_items mi
                 JOIN branch_menu_items bmi
                   ON bmi.tenant_id = mi.tenant_id AND bmi.menu_item_id = mi.id
                 LEFT JOIN menu_item_images img ON img.tenant_id=mi.tenant_id AND img.item_id=mi.id
                 WHERE mi.tenant_id = ? AND bmi.branch_id = ?
-                  AND mi.is_active = TRUE AND bmi.is_available = TRUE
+                  AND mi.is_active = TRUE
                 ORDER BY mi.name
                 """, rs -> {
             UUID categoryId = rs.getObject("category_id", UUID.class);
             itemsByCategory.computeIfAbsent(categoryId, ignored -> new ArrayList<>()).add(
                     new MenuItem(rs.getObject("id", UUID.class), rs.getString("name"),
                             rs.getString("description"), rs.getBigDecimal("price"),
-                            rs.getString("dietary_type"), rs.getInt("prep_time_minutes"),rs.getString("image_url")));
+                            rs.getString("dietary_type"), rs.getInt("prep_time_minutes"),rs.getString("image_url"),rs.getBoolean("is_available")));
         }, restaurant.id(), selectedBranch.id());
 
         List<MenuCategory> categories = jdbc.query("""
