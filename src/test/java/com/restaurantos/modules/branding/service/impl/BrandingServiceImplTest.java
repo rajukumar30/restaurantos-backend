@@ -26,6 +26,16 @@ class BrandingServiceImplTest {
  @Test void authorizedPublicationUsesTenantAndFeature(){
   when(auth.getPrincipal()).thenReturn(user);when(dao.canManage(tenant,user)).thenReturn(true);
   var settings=BrandingSettings.defaults("Restaurant");
-  assertSame(settings,service.publish(tenant,settings,auth));verify(features).require(tenant,"QR_MENU");verify(dao).publish(tenant,settings);
+  assertEquals(settings,service.publish(tenant,settings,auth));verify(features).require(tenant,"QR_MENU");verify(dao).publish(tenant,settings);
+ }
+ @Test void rejectsCrossTenantStoredImage(){
+  when(auth.getPrincipal()).thenReturn(user);when(dao.canManage(tenant,user)).thenReturn(true);
+  var settings=BrandingSettings.defaults("Restaurant").withImages("/api/v1/public/guest-website/images/"+UUID.randomUUID(),"");
+  assertThrows(ResponseStatusException.class,()->service.publish(tenant,settings,auth));verify(dao,never()).publish(any(),any());
+ }
+ @Test void rejectsUntrustedImageScheme(){
+  when(auth.getPrincipal()).thenReturn(user);when(dao.canManage(tenant,user)).thenReturn(true);
+  var settings=BrandingSettings.defaults("Restaurant").withImages("javascript:alert(1)","");
+  assertThrows(ResponseStatusException.class,()->service.publish(tenant,settings,auth));verify(dao,never()).publish(any(),any());
  }
 }

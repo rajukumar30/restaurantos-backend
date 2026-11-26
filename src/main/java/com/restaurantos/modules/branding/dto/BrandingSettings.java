@@ -22,6 +22,9 @@ public record BrandingSettings(
  @NotNull Boolean showFeatured,
  @NotNull Boolean showDetails
 ){
+ public BrandingSettings withImages(String logo,String banner){
+  return new BrandingSettings(displayName,slogan,logo,banner,theme,primaryColor,accentColor,backgroundColor,bannerTitle,bannerText,about,contactPhone,address,openingHours,showBanner,showFeatured,showDetails);
+ }
  public static BrandingSettings defaults(String name){
   return legacy(name,"","","","CLASSIC");
  }

@@ -38,6 +38,32 @@ public class BrandingDao {
       AND p.permission_key='menu:manage')
    """,Boolean.class,tenantId,userId));
  }
+ public void lockTenant(UUID tenantId){
+  jdbc.queryForObject("SELECT id FROM tenants WHERE id=? AND status='ACTIVE' FOR UPDATE",UUID.class,tenantId);
+ }
+ public String storeImage(UUID tenantId,String slot,byte[] bytes){
+  UUID id=UUID.randomUUID();
+  jdbc.update("""
+   INSERT INTO restaurant_brand_images(id,tenant_id,slot,image_bytes) VALUES(?,?,?,?)
+   ON CONFLICT(tenant_id,slot) DO UPDATE SET id=EXCLUDED.id,image_bytes=EXCLUDED.image_bytes
+   """,id,tenantId,slot,bytes);
+  return "/api/v1/public/guest-website/images/"+id;
+ }
+ public boolean ownsImage(UUID tenantId,String slot,UUID id){
+  return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM restaurant_brand_images WHERE tenant_id=? AND slot=? AND id=?)",Boolean.class,tenantId,slot,id));
+ }
+ public void removeImage(UUID tenantId,String slot){
+  jdbc.update("DELETE FROM restaurant_brand_images WHERE tenant_id=? AND slot=?",tenantId,slot);
+ }
+ public java.util.Optional<byte[]> publishedImage(UUID id){
+  return jdbc.query("""
+   SELECT i.image_bytes FROM restaurant_brand_images i
+   JOIN tenants t ON t.id=i.tenant_id AND t.status='ACTIVE'
+   JOIN restaurant_guest_branding gb ON gb.tenant_id=i.tenant_id
+   WHERE i.id=? AND (CASE WHEN i.slot='LOGO' THEN gb.logo_url ELSE gb.banner_url END)
+     = '/api/v1/public/guest-website/images/' || CAST(i.id AS text)
+   """,(rs,row)->rs.getBytes(1),id).stream().findFirst();
+ }
  public void publish(UUID tenantId,BrandingSettings settings){
   String json;
   try{json=mapper.writeValueAsString(settings);}catch(JsonProcessingException e){throw new IllegalStateException("Cannot serialize branding",e);}
