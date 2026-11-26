@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.server.ResponseStatusException;
 import java.util.*;
+import java.time.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 class OrderQueryServiceImplTest {
@@ -68,5 +69,48 @@ class OrderQueryServiceImplTest {
   verify(access).requireBranchInTenant(tenant,branch);
   verify(features).require(tenant,"GUEST_ORDERING");
   verify(dao).list(tenant,branch);
+ }
+ @Test void workspaceDefaultsToTodayInBranchTimezone(){
+  UUID tenant=UUID.randomUUID(),branch=UUID.randomUUID();
+  ZoneId zone=ZoneId.of("Asia/Kolkata");
+  when(dao.branchTimezone(tenant,branch)).thenReturn(zone.getId());
+  var query=new OrderWorkspaceQuery(branch,null,"day","ALL","",1,20);
+  LocalDate before=LocalDate.now(zone);
+  service.workspace(tenant,query,auth);
+  var captured=org.mockito.ArgumentCaptor.forClass(LocalDate.class);
+  var today=org.mockito.ArgumentCaptor.forClass(LocalDate.class);
+  verify(dao).workspace(eq(tenant),eq(query),captured.capture(),today.capture(),eq(zone));
+  assertEquals(today.getValue(),captured.getValue());
+  assertTrue(captured.getValue().equals(before)||captured.getValue().equals(LocalDate.now(zone)));
+  verify(access).requirePermission(auth,tenant,branch,"orders:read");
+  verify(access).requireBranchInTenant(tenant,branch);
+  verify(features).require(tenant,"GUEST_ORDERING");
+  verify(dao,never()).list(any(),any());
+ }
+ @Test void workspaceUsesRequestedDateAndBranchZone(){
+  UUID tenant=UUID.randomUUID(),branch=UUID.randomUUID();ZoneId zone=ZoneId.of("America/New_York");
+  when(dao.branchTimezone(tenant,branch)).thenReturn(zone.getId());
+  LocalDate date=LocalDate.of(2024,3,10);
+  var query=new OrderWorkspaceQuery(branch,date,"day","READY","table",2,20);
+  service.workspace(tenant,query,auth);
+  verify(dao).workspace(eq(tenant),eq(query),eq(date),any(LocalDate.class),eq(zone));
+ }
+ @Test void workspaceRejectsOversizedPageAndUnsupportedMode(){
+  UUID tenant=UUID.randomUUID(),branch=UUID.randomUUID();
+  assertThrows(ResponseStatusException.class,()->service.workspace(tenant,new OrderWorkspaceQuery(branch,null,"day","ALL","",1,1000),auth));
+  assertThrows(ResponseStatusException.class,()->service.workspace(tenant,new OrderWorkspaceQuery(branch,null,"all-time","ALL","",1,20),auth));
+  verify(dao,never()).workspace(any(),any(),any(),any(),any());
+ }
+ @Test void workspaceRejectsFutureDates(){
+  UUID tenant=UUID.randomUUID(),branch=UUID.randomUUID();
+  when(dao.branchTimezone(tenant,branch)).thenReturn("Asia/Kolkata");
+  assertThrows(ResponseStatusException.class,()->service.workspace(tenant,new OrderWorkspaceQuery(branch,LocalDate.now(ZoneId.of("Asia/Kolkata")).plusDays(2),"day","ALL","",1,20),auth));
+  verify(dao,never()).workspace(any(),any(),any(),any(),any());
+ }
+ @Test void workspaceDeniedWhenOrderingDisabled(){
+  UUID tenant=UUID.randomUUID(),branch=UUID.randomUUID();
+  doThrow(new ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN)).when(features).require(tenant,"GUEST_ORDERING");
+  assertThrows(ResponseStatusException.class,()->service.workspace(tenant,new OrderWorkspaceQuery(branch,null,"live","ALL","",1,20),auth));
+  verifyNoInteractions(dao);
  }
 }
