@@ -11,5 +11,5 @@ public interface MenuService {
  ItemCreated createItemWithImage(UUID tenantId,CreateMenuItemRequest request,MultipartFile image,Authentication auth);
  ImageUpdated replaceImage(UUID tenantId,UUID branchId,UUID itemId,MultipartFile image,Authentication auth);
  ImageUpdated removeImage(UUID tenantId,UUID branchId,UUID itemId,Authentication auth);
- Optional<byte[]> publicImage(UUID id);
+ Optional<byte[]> publicImage(UUID id,boolean thumbnail);
 }

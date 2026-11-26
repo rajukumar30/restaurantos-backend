@@ -1,63 +1,99 @@
 package com.restaurantos.common.image;
-
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.*;
+import java.util.concurrent.Semaphore;
 import javax.imageio.*;
 import javax.imageio.stream.ImageOutputStream;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.multipart.MultipartFile;
 
-/** Only fixed-size, bounded, decoded raster images can be persisted. */
+/** Decode only bounded raster files; create all display variants at upload time. */
 public final class ImageOptimizer {
  private ImageOptimizer(){}
+ private static final Semaphore PROCESSING=new Semaphore(2,true);
  public enum Kind {
-  ITEM(1000,800,180*1024), BANNER(1600,900,250*1024), LOGO(512,512,120*1024);
+  ITEM(800,640,100*1024), BANNER(960,540,120*1024), LOGO(256,256,40*1024);
   public final int width,height,maxBytes;
   Kind(int width,int height,int maxBytes){this.width=width;this.height=height;this.maxBytes=maxBytes;}
  }
  public record Image(byte[] bytes,String contentType){}
+ public record MenuImages(Image detail,Image thumbnail){}
+ private record Decoded(BufferedImage image,String format){}
  public static Image optimize(MultipartFile file,Kind kind){
   if(file==null)return null;
-  if(file.isEmpty()||file.getSize()>512000)throw bad("Upload a cropped, compressed photo under 500 KB.");
+  if(kind==Kind.ITEM)return menuImages(file).detail();
+  acquire();
+  try{
+   var decoded=decode(file,kind);
+   if(kind==Kind.LOGO)return logo(decoded);
+   return photo(decoded.image(),kind.width,kind.height,kind.maxBytes,80*1024);
+  }catch(ResponseStatusException e){throw e;}catch(IOException|RuntimeException e){throw bad("Choose a valid cropped photo and try again.");}
+  finally{PROCESSING.release();}
+ }
+ public static MenuImages menuImages(MultipartFile file){
+  acquire();
+  try{
+   var source=decode(file,Kind.ITEM).image();
+   return new MenuImages(photo(source,800,640,100*1024,60*1024),photo(source,400,320,40*1024,25*1024));
+  }catch(ResponseStatusException e){throw e;}catch(IOException|RuntimeException e){throw bad("Choose a valid cropped photo and try again.");}
+  finally{PROCESSING.release();}
+ }
+ private static void acquire(){
+  if(!PROCESSING.tryAcquire())throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,"Image processing is busy. Please retry in a moment.");
+ }
+ private static Decoded decode(MultipartFile file,Kind kind)throws IOException{
+  if(file==null||file.isEmpty()||file.getSize()>512000)throw bad("Upload a cropped, compressed photo under 500 KB.");
   try(var input=ImageIO.createImageInputStream(new ByteArrayInputStream(file.getBytes()))){
    var readers=ImageIO.getImageReaders(input);
    if(!readers.hasNext())throw new IOException("Unsupported image");
    var reader=readers.next();
-   BufferedImage image;
-   String format;
    try{
-    reader.setInput(input,true,true);format=reader.getFormatName();
+    reader.setInput(input,true,true);String format=reader.getFormatName();
     if(!("JPEG".equalsIgnoreCase(format)||"PNG".equalsIgnoreCase(format)))throw new IOException("Unsupported format");
     int w=reader.getWidth(0),h=reader.getHeight(0);
-    if(kind==Kind.LOGO ? w!=h||w<128||w>512 : w!=kind.width||h!=kind.height)throw bad(kind==Kind.LOGO?"Logo must be square, 128–512 pixels.":("Image must be "+kind.width+" × "+kind.height+" pixels. Crop it before uploading."));
-    image=reader.read(0);
+    // Accept the previous client dimensions during rolling deployment; normalize before storage.
+    boolean valid=switch(kind){
+     case ITEM -> (w==800&&h==640)||(w==1000&&h==800);
+     case BANNER -> (w==960&&h==540)||(w==1600&&h==900);
+     case LOGO -> w==h&&w>=96&&w<=512;
+    };
+    if(!valid)throw bad("Image has unsupported dimensions. Crop it before uploading.");
+    return new Decoded(reader.read(0),format);
    }finally{reader.dispose();}
-   if(kind==Kind.LOGO){
-    // Re-encode PNG to preserve alpha and remove metadata. JPEG logos remain JPEG.
-    if("PNG".equalsIgnoreCase(format)){
-     // Preserve transparency and use the largest square raster within the database cap.
-     for(int size:new int[]{image.getWidth(),384,320,256,192,128}){
-      if(size>image.getWidth())continue;
-      BufferedImage scaled=new BufferedImage(size,size,BufferedImage.TYPE_INT_ARGB);
-      Graphics2D g=scaled.createGraphics();
-      try{g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,RenderingHints.VALUE_INTERPOLATION_BICUBIC);g.drawImage(image,0,0,size,size,null);}finally{g.dispose();}
-      var out=new ByteArrayOutputStream();
-      if(ImageIO.write(scaled,"PNG",out)&&out.size()<=kind.maxBytes)return new Image(out.toByteArray(),"image/png");
-     }
-     throw bad("Unable to optimize logo. Please select a valid image.");
-    }
-   }
-   int width=kind==Kind.LOGO?image.getWidth():kind.width,height=kind==Kind.LOGO?image.getHeight():kind.height;
-   BufferedImage rgb=new BufferedImage(width,height,BufferedImage.TYPE_INT_RGB);
-   Graphics2D graphics=rgb.createGraphics();try{graphics.setColor(Color.WHITE);graphics.fillRect(0,0,width,height);graphics.drawImage(image,0,0,null);}finally{graphics.dispose();}
-   for(float quality:new float[]{.83f,.72f,.60f,.48f,.36f,.25f}){
-    byte[] bytes=jpeg(rgb,quality);
-    if(bytes.length<=kind.maxBytes)return new Image(bytes,"image/jpeg");
-   }
-   throw bad("Image cannot be compressed to the required size. Choose a simpler photo.");
-  }catch(ResponseStatusException e){throw e;}catch(IOException|RuntimeException e){throw bad("Choose a valid cropped photo and try again.");}
+  }
+ }
+ private static BufferedImage scaled(BufferedImage source,int w,int h,boolean alpha){
+  var image=new BufferedImage(w,h,alpha?BufferedImage.TYPE_INT_ARGB:BufferedImage.TYPE_INT_RGB);
+  Graphics2D g=image.createGraphics();
+  try{g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+   if(!alpha){g.setColor(Color.WHITE);g.fillRect(0,0,w,h);}
+   g.drawImage(source,0,0,w,h,null);
+  }finally{g.dispose();}
+  return image;
+ }
+ private static Image logo(Decoded decoded)throws IOException{
+  BufferedImage source=decoded.image();int size=Math.min(source.getWidth(),256);
+  if("JPEG".equalsIgnoreCase(decoded.format()))return photo(source,size,size,40*1024,20*1024);
+  for(int n:new int[]{size,192,160,128,96}){
+   if(n>size)continue;
+   var out=new ByteArrayOutputStream();
+   if(ImageIO.write(scaled(source,n,n,true),"PNG",out)&&out.size()<=40*1024)return new Image(out.toByteArray(),"image/png");
+  }
+  throw bad("Unable to optimize logo. Choose a valid image.");
+ }
+ private static Image photo(BufferedImage source,int w,int h,int max,int target)throws IOException{
+  var rgb=scaled(source,w,h,false);byte[] best=null;
+  for(float q:new float[]{.88f,.80f,.72f,.64f,.56f,.48f,.40f,.32f,.24f,.16f,.10f,.05f}){
+   byte[] bytes=jpeg(rgb,q);
+   if(bytes.length<=max&&best==null)best=bytes;
+   if(bytes.length<=target)return new Image(bytes,"image/jpeg");
+   // Do not trade obvious quality loss just to meet a soft target.
+   if(best!=null&&q<=.64f)return new Image(best,"image/jpeg");
+  }
+  if(best!=null)return new Image(best,"image/jpeg");
+  throw bad("Unable to compress photo to the maximum file size.");
  }
  private static byte[] jpeg(BufferedImage image,float quality)throws IOException{
   var writer=ImageIO.getImageWritersByFormatName("JPEG").next();

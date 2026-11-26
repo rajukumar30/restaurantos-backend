@@ -11,7 +11,12 @@ public class PublicMenuImageController {
  public PublicMenuImageController(MenuService service){this.service=service;}
  @GetMapping(value="/{id}",produces=MediaType.IMAGE_JPEG_VALUE)
  public ResponseEntity<byte[]> image(@PathVariable UUID id){
-  return service.publicImage(id).map(bytes->ResponseEntity.ok().contentType(MediaType.IMAGE_JPEG)
+  return response(id,false);
+ }
+ @GetMapping(value="/{id}/thumbnail",produces=MediaType.IMAGE_JPEG_VALUE)
+ public ResponseEntity<byte[]> thumbnail(@PathVariable UUID id){return response(id,true);}
+ private ResponseEntity<byte[]> response(UUID id,boolean thumbnail){
+  return service.publicImage(id,thumbnail).map(bytes->ResponseEntity.ok().contentType(MediaType.IMAGE_JPEG)
    .cacheControl(CacheControl.maxAge(Duration.ofHours(24)).cachePublic().immutable()).body(bytes))
    .orElseGet(()->ResponseEntity.notFound().build());
  }

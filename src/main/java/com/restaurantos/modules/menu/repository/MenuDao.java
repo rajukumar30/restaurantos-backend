@@ -66,21 +66,21 @@ public class MenuDao {
     WHERE mi.tenant_id=? AND bmi.branch_id=? AND mi.id=? AND mi.is_active=TRUE)
    """,Boolean.class,tenantId,branchId,itemId));
  }
- public String storeImage(UUID tenantId,UUID itemId,byte[] bytes){
+ public String storeImage(UUID tenantId,UUID itemId,byte[] bytes,byte[] thumbnail){
   UUID id=UUID.randomUUID();
   jdbc.update("""
-   INSERT INTO menu_item_images(id,tenant_id,item_id,image_bytes) VALUES(?,?,?,?)
-   ON CONFLICT(item_id) DO UPDATE SET id=EXCLUDED.id,image_bytes=EXCLUDED.image_bytes WHERE menu_item_images.tenant_id=EXCLUDED.tenant_id
-   """,id,tenantId,itemId,bytes);return "/api/v1/public/menu/images/"+id;
+   INSERT INTO menu_item_images(id,tenant_id,item_id,image_bytes,thumbnail_bytes) VALUES(?,?,?,?,?)
+   ON CONFLICT(item_id) DO UPDATE SET id=EXCLUDED.id,image_bytes=EXCLUDED.image_bytes,thumbnail_bytes=EXCLUDED.thumbnail_bytes WHERE menu_item_images.tenant_id=EXCLUDED.tenant_id
+   """,id,tenantId,itemId,bytes,thumbnail);return "/api/v1/public/menu/images/"+id;
  }
  public void removeImage(UUID tenantId,UUID itemId){jdbc.update("DELETE FROM menu_item_images WHERE tenant_id=? AND item_id=?",tenantId,itemId);}
- public Optional<byte[]> publicImage(UUID id){
+ public Optional<byte[]> publicImage(UUID id,boolean thumbnail){
   return jdbc.query("""
-   SELECT img.image_bytes FROM menu_item_images img JOIN tenants t ON t.id=img.tenant_id AND t.status='ACTIVE'
+   SELECT CASE WHEN ? THEN COALESCE(img.thumbnail_bytes,img.image_bytes) ELSE img.image_bytes END FROM menu_item_images img JOIN tenants t ON t.id=img.tenant_id AND t.status='ACTIVE'
    JOIN menu_items mi ON mi.tenant_id=img.tenant_id AND mi.id=img.item_id AND mi.is_active=TRUE
    JOIN menu_categories mc ON mc.tenant_id=mi.tenant_id AND mc.id=mi.category_id AND mc.is_active=TRUE
    WHERE img.id=? AND EXISTS(SELECT 1 FROM branch_menu_items bmi JOIN branches b ON b.id=bmi.branch_id AND b.tenant_id=bmi.tenant_id
      WHERE bmi.tenant_id=mi.tenant_id AND bmi.menu_item_id=mi.id AND b.status='ACTIVE')
-   """,(rs,row)->rs.getBytes(1),id).stream().findFirst();
+   """,(rs,row)->rs.getBytes(1),thumbnail,id).stream().findFirst();
  }
 }

@@ -58,17 +58,17 @@ public class MenuServiceImpl implements MenuService {
  @Transactional
  public ItemCreated createItemWithImage(UUID tenantId,CreateMenuItemRequest request,MultipartFile image,Authentication auth){
   authorize(auth,tenantId,request.branchId(),"menu:manage");
-  var optimized=ImageOptimizer.optimize(image,ImageOptimizer.Kind.ITEM);
+  var optimized=ImageOptimizer.menuImages(image);
   ItemCreated created=createItem(tenantId,request,auth);
-  dao.storeImage(tenantId,created.id(),optimized.bytes());
+  dao.storeImage(tenantId,created.id(),optimized.detail().bytes(),optimized.thumbnail().bytes());
   return created;
  }
  @Transactional
  public ImageUpdated replaceImage(UUID tenantId,UUID branchId,UUID itemId,MultipartFile image,Authentication auth){
   authorize(auth,tenantId,branchId,"menu:manage");
   requireItem(tenantId,branchId,itemId);
-  var optimized=ImageOptimizer.optimize(image,ImageOptimizer.Kind.ITEM);
-  return new ImageUpdated(itemId,dao.storeImage(tenantId,itemId,optimized.bytes()));
+  var optimized=ImageOptimizer.menuImages(image);
+  return new ImageUpdated(itemId,dao.storeImage(tenantId,itemId,optimized.detail().bytes(),optimized.thumbnail().bytes()));
  }
  @Transactional
  public ImageUpdated removeImage(UUID tenantId,UUID branchId,UUID itemId,Authentication auth){
@@ -79,5 +79,5 @@ public class MenuServiceImpl implements MenuService {
   if(!dao.assignedItemExists(tenantId,branchId,itemId))throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Menu item not found in this branch.");
  }
  @Transactional(readOnly=true)
- public Optional<byte[]> publicImage(UUID id){return dao.publicImage(id);}
+ public Optional<byte[]> publicImage(UUID id,boolean thumbnail){return dao.publicImage(id,thumbnail);}
 }
