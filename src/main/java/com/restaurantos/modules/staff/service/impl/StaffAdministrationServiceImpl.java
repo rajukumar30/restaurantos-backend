@@ -66,10 +66,10 @@ public class StaffAdministrationServiceImpl implements StaffAdministrationServic
         dao.createRole(roleId, tenantId, roleKey, displayName);
         List<String> permissions = switch (roleKey) {
             case "MANAGER" -> List.of("staff:read", "staff:manage", "branch:read", "menu:read",
-                "menu:manage", "orders:read", "orders:manage", "kitchen:operate", "payments:read", "reports:read");
+                "menu:manage", "orders:read", "orders:manage", "kitchen:operate", "payments:read", "reports:read","floor:read","floor:manage");
             case "KITCHEN" -> List.of("orders:read", "kitchen:operate");
             case "CASHIER" -> List.of("orders:read", "payments:read");
-            case "WAITER" -> List.of("orders:read", "orders:manage");
+            case "WAITER" -> List.of("orders:read", "orders:manage","floor:read","floor:manage");
             default -> List.of("orders:read");
         };
         dao.grantPermissions(roleId, permissions);

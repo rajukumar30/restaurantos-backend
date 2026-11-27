@@ -36,6 +36,8 @@ public class RealtimeEventPublisherImpl implements RealtimeEventPublisher {
     @Override
     public void publishMenuAfterCommit(RealtimeEvent event) { publish(event, "menu"); }
 
+    @Override public void publishFloorAfterCommit(RealtimeEvent event){publish(event,"floor");}
+
     private void publish(RealtimeEvent event, String topic) {
         if (!TransactionSynchronizationManager.isActualTransactionActive()
                 || !TransactionSynchronizationManager.isSynchronizationActive())

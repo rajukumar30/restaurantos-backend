@@ -35,7 +35,8 @@ public class TableDao {
   return jdbc.update("""
    UPDATE restaurant_tables SET display_name=?,seating_capacity=?,is_active=?,updated_at=NOW()
    WHERE tenant_id=? AND branch_id=? AND id=?
-   """,request.displayName().trim(),request.seatingCapacity(),request.active(),tenantId,branchId,tableId);
+   AND NOT EXISTS(SELECT 1 FROM table_visits v WHERE v.tenant_id=restaurant_tables.tenant_id AND v.branch_id=restaurant_tables.branch_id AND v.table_id=restaurant_tables.id AND v.status IN ('OPEN','PAYMENT_PENDING','PAID') AND (?=false OR COALESCE(v.floor_guest_count,0)>?))
+   """,request.displayName().trim(),request.seatingCapacity(),request.active(),tenantId,branchId,tableId,request.active(),request.seatingCapacity());
  }
  public RestaurantTable find(UUID tenantId,UUID branchId,UUID tableId){
   return jdbc.queryForObject("""

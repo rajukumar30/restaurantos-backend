@@ -43,7 +43,7 @@ public class TableManagementServiceImpl implements TableManagementService {
  public RestaurantTable update(UUID tenantId,UUID tableId,UpdateTableRequest request,Authentication auth){
   authorize(auth,tenantId,request.branchId(),"tables:manage");
   if(dao.update(tenantId,request.branchId(),tableId,request)==0)
-   throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Table not found in this branch.");
+   throw new ResponseStatusException(HttpStatus.CONFLICT,"Table not found or has an active visit. Finish the visit before deactivating or reducing capacity.");
   return dao.find(tenantId,request.branchId(),tableId);
  }
  @Transactional(readOnly=true)
