@@ -31,7 +31,7 @@ public class BillReceiptServiceImpl implements BillReceiptService {
 
     @Override @Transactional
     public ReceiptLink issue(UUID tenantId, UUID visitId, UUID branchId, Authentication auth) {
-        access.requirePermission(auth, tenantId, branchId, "orders:manage");
+        access.requirePermission(auth, tenantId, branchId, "payments:read");
         access.requireBranchInTenant(tenantId, branchId);
         if (publicBaseUrl.isBlank() || !publicBaseUrl.startsWith("https://"))
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Public receipt URL not configured");

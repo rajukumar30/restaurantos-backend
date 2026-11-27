@@ -33,6 +33,7 @@ class BillReceiptServiceImplTest {
         when(dao.hasConfirmedPayment(tenant,visit)).thenReturn(true);
         var link = service.issue(tenant,visit,branch,auth);
         assertTrue(link.url().matches("https://example.com/api/v1/public/receipts/[a-f0-9]{64}\\.pdf"));
+        verify(access).requirePermission(auth,tenant,branch,"payments:read");
         verify(dao).deleteExistingLinks(tenant,visit);
         verify(dao).insertLink(argThat(hash -> hash.matches("[a-f0-9]{64}") &&
             !link.url().contains(hash)),eq(tenant),eq(visit));
