@@ -8,5 +8,5 @@ class OrderSecurityServiceTest{
  @Test void strictAlwaysReviewsEvenVerified(){assertNotNull(OrderSecurityService.reviewReason(mode("STRICT"),true,BigDecimal.TEN,1,BigDecimal.ZERO));}
  @Test void expressNormalOrderIsImmediate(){assertNull(OrderSecurityService.reviewReason(mode("EXPRESS"),false,new BigDecimal("500"),3,BigDecimal.ZERO));}
  @Test void expressExcessQuantityOrAmountOrCumulativeSpendRequiresReview(){assertNotNull(OrderSecurityService.reviewReason(mode("EXPRESS"),false,BigDecimal.TEN,7,BigDecimal.ZERO));assertNotNull(OrderSecurityService.reviewReason(mode("EXPRESS"),false,new BigDecimal("1001"),1,BigDecimal.ZERO));assertNotNull(OrderSecurityService.reviewReason(mode("EXPRESS"),false,new BigDecimal("501"),1,new BigDecimal("1500")));}
- @Test void verifiedExpressDeviceDoesNotNeedLowTrustCaps(){assertNull(OrderSecurityService.reviewReason(mode("EXPRESS"),true,new BigDecimal("3000"),10,BigDecimal.ZERO));}
+ @Test void verifiedExpressDeviceStillRequiresReviewForLargeOrderButNotCumulativeUnverifiedSpend(){assertNotNull(OrderSecurityService.reviewReason(mode("EXPRESS"),true,new BigDecimal("3000"),10,BigDecimal.ZERO));assertNull(OrderSecurityService.reviewReason(mode("EXPRESS"),true,new BigDecimal("500"),3,new BigDecimal("2000")));}
 }

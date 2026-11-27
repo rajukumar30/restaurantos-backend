@@ -61,7 +61,7 @@ public class OrderSecurityService{
  }
  static String reviewReason(Settings s,boolean verified,BigDecimal total,int units,BigDecimal previous){
   if("STRICT".equals(s.mode()))return "Every order requires staff review";
-  if("EXPRESS".equals(s.mode())&&(!verified&&(units>s.maxUnits()||total.compareTo(s.maxOrderAmount())>0||previous.add(total).compareTo(s.maxVisitAmount())>0)))return "Express limit exceeded";
+  if("EXPRESS".equals(s.mode())&&(units>s.maxUnits()||total.compareTo(s.maxOrderAmount())>0||(!verified&&previous.add(total).compareTo(s.maxVisitAmount())>0)))return "Express limit exceeded";
   return null;
  }
  @Transactional public OrderReceipt submit(String qr,String token,PlaceOrderRequest request,String idempotencyKey){
