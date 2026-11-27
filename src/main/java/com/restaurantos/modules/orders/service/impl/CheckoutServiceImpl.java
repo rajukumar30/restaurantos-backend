@@ -49,7 +49,7 @@ public class CheckoutServiceImpl implements CheckoutService{
  @Transactional
  public Merchant merchant(UUID tenant,UUID branch,Merchant update,Authentication auth){
   authorize(tenant,branch,auth);if(update==null)return dao.merchant(tenant,branch);
-  if(!access.hasTenantWidePermission(auth,tenant,"payments:read"))throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Owner access required");
+  if(!access.hasTenantWidePermission(auth,tenant,"staff:manage"))throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Owner access required");
   String upi=update.upiId()==null?"":update.upiId().trim(),name=update.merchantName()==null?"":update.merchantName().trim();
   if(!upi.isEmpty()&&(!upi.matches("[A-Za-z0-9._-]{2,100}@[A-Za-z0-9.-]{2,50}")||name.isBlank()))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Enter a valid merchant UPI ID and name.");
   var m=new Merchant(upi.isEmpty()?null:upi,name.isEmpty()?null:name);dao.merchant(tenant,branch,m);return m;

@@ -80,7 +80,7 @@ public class OrderPlacementServiceImpl implements OrderPlacementService {
   String notes=request.notes()==null||request.notes().isBlank()?null:request.notes().trim();
   dao.createOrder(orderId,orderNumber,table,visitId,request.customerName().trim(),request.customerPhone(),notes,total,idempotencyKey,requestHash);
   dao.createOrderItems(table.tenantId(),orderId,lines);
-  events.publishAfterCommit(RealtimeEvent.orderChanged("ORDER_CREATED",table.tenantId(),table.branchId(),orderId));
+  events.publishAfterCommit(new RealtimeEvent(UUID.randomUUID(),"ORDER_CREATED",table.tenantId(),table.branchId(),orderId,1,java.time.Instant.now(),Map.of("tableId",table.tableId().toString())));
   return new OrderReceipt(orderId,orderNumber,table.displayName(),total,"NEW");
  }
 }

@@ -127,4 +127,7 @@ public class OrderQueryDao {
    """,(rs,row)->new OrderSummary(rs.getObject("id",UUID.class),rs.getString("order_number"),rs.getString("table_name"),rs.getString("status"),rs.getBigDecimal("total_amount"),rs.getInt("line_count"),rs.getInt("item_count"),rs.getString("items_summary"),rs.getTimestamp("created_at").toInstant()),args.toArray());
   return new OrderWorkspacePage(date,today,zone.getId(),q.mode(),counts,active[0],active[1],items,total,page,q.size());
  }
+ public UUID orderTable(UUID tenant,UUID branch,UUID order){
+  return jdbc.query("SELECT table_id FROM restaurant_orders WHERE tenant_id=? AND branch_id=? AND id=?",(r,i)->r.getObject(1,UUID.class),tenant,branch,order).stream().findFirst().orElse(null);
+ }
 }

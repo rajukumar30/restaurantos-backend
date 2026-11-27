@@ -86,7 +86,7 @@ public class CheckoutDao{
  FROM restaurant_orders o WHERE o.tenant_id=? AND o.branch_id=? AND o.table_visit_id=? AND o.status='SERVED' ORDER BY o.id FOR UPDATE OF o
  """,(r,i)->new Allocation(r.getObject(1,UUID.class),r.getBigDecimal(2)),s.tenant(),s.branch(),s.visit());}
  public boolean referenceUsed(Scope s,String method,String ref){return ref!=null&&Boolean.TRUE.equals(jdbc.queryForObject("""
- SELECT EXISTS(SELECT 1 FROM restaurant_order_payments WHERE tenant_id=? AND method=? AND reference=?)
+ SELECT EXISTS(SELECT 1 FROM restaurant_order_payments WHERE tenant_id=? AND method=? AND upper(reference)=?)
  """,Boolean.class,s.tenant(),method,ref));}
  public void record(Scope s,UUID key,String method,String ref,BigDecimal amount){
   jdbc.update("INSERT INTO table_bill_payments(id,tenant_id,visit_id,provider,provider_order_id,provider_payment_id,amount,status,confirmed_at) VALUES(?,?,?,?,?,?,?,'PAID',NOW())",key,s.tenant(),s.visit(),"MANUAL_"+method,ref,key.toString(),amount);

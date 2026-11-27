@@ -39,7 +39,7 @@ public class StaffBillingServiceImpl implements StaffBillingService {
   dao.lockPaymentTable(tenantId,request.branchId(),orderId);
   List<BigDecimal> totals=dao.lockServedOrder(tenantId,request.branchId(),orderId);
   if(totals.isEmpty())
-   throw new ResponseStatusException(HttpStatus.CONFLICT,"Only served orders can be paid");
+   throw new ResponseStatusException(HttpStatus.CONFLICT,"Only served standalone orders can be paid here. Use consolidated checkout for table visits.");
   BigDecimal paid=dao.paid(tenantId,request.branchId(),orderId);
   BigDecimal balance=totals.getFirst().subtract(paid==null?BigDecimal.ZERO:paid);
   if(request.amount().compareTo(balance)>0)

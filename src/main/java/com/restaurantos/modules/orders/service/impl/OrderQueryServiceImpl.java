@@ -75,7 +75,8 @@ public class OrderQueryServiceImpl implements OrderQueryService {
    UUID actorId=(UUID)auth.getPrincipal();
    dao.recordServed(tenantId,request.branchId(),orderId,actorId);
   }
-  events.publishAfterCommit(RealtimeEvent.orderChanged("ORDER_STATUS_CHANGED",tenantId,request.branchId(),orderId));
+  UUID table=dao.orderTable(tenantId,request.branchId(),orderId);
+  events.publishAfterCommit(new RealtimeEvent(UUID.randomUUID(),"ORDER_STATUS_CHANGED",tenantId,request.branchId(),orderId,1,Instant.now(),table==null?Map.of():Map.of("tableId",table.toString())));
   return new OrderStatusUpdated(orderId,status);
  }
 }
