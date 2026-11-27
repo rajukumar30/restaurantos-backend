@@ -1,5 +1,7 @@
 package com.restaurantos.modules.orders;
 
+import com.restaurantos.modules.dining.service.DiningSessionService;
+import org.springframework.transaction.annotation.Transactional;
 import com.restaurantos.common.api.ApiResponse;
 import com.restaurantos.modules.orders.dto.OrderDto.*;
 import com.restaurantos.modules.orders.service.OrderQueryService;
@@ -17,18 +19,25 @@ import org.springframework.format.annotation.DateTimeFormat;
 public class OrderController {
     private final OrderQueryService orderQueries;
     private final OrderPlacementService orderPlacement;
+    private final DiningSessionService dining;
 
-    public OrderController(OrderQueryService orderQueries,OrderPlacementService orderPlacement){
+    public OrderController(OrderQueryService orderQueries,OrderPlacementService orderPlacement,DiningSessionService dining){
         this.orderQueries=orderQueries;
-        this.orderPlacement=orderPlacement;
+        this.orderPlacement=orderPlacement;this.dining=dining;
     }
 
+    @Transactional
     @PostMapping("/api/v1/public/qr/{qrToken}/orders")
     public ApiResponse<OrderReceipt> placeQrOrder(@PathVariable String qrToken,
             @Valid @RequestBody PlaceOrderRequest request,
             @RequestHeader(value="Idempotency-Key",required=false) String idempotencyKey,
-            Authentication authentication){
-        return ApiResponse.success("Order placed successfully",orderPlacement.place(qrToken,request,idempotencyKey));
+            @RequestHeader(value="X-Dining-Session",required=false) String session,Authentication authentication){
+        var visit=dining.require(qrToken,session,true,true);
+        String key=dining.orderKey(visit,idempotencyKey);
+        dining.checkOrderLimits(visit,request.items().stream().mapToLong(line->line.quantity()).sum(),request.items().size(),key);
+        var receipt=orderPlacement.place(qrToken,request,key);
+        dining.recordOrder(visit,receipt.orderId());
+        return ApiResponse.success("Order placed successfully",receipt);
     }
 
     @GetMapping("/api/v1/public/qr/{qrToken}/orders/{orderId}")

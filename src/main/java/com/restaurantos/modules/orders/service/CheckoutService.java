@@ -4,6 +4,7 @@ import java.util.UUID;
 import org.springframework.security.core.Authentication;
 public interface CheckoutService{
  Detail guest(String qr,UUID order,boolean begin);
+ Detail guestVisit(Scope scope,boolean begin);
  Page page(UUID tenant,UUID branch,String filter,String search,int page,int size,Authentication auth);
  Detail detail(UUID tenant,UUID branch,UUID visit,Authentication auth);
  Detail change(UUID tenant,UUID branch,UUID visit,boolean begin,Authentication auth);

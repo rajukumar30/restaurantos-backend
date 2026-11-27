@@ -26,6 +26,8 @@ public class CheckoutServiceImpl implements CheckoutService{
  private void begin(Scope s){var b=dao.bill(s);if("PAYMENT_PENDING".equals(b.status()))return;if(!"OPEN".equals(b.status())||b.orderCount()==0||b.unfinished()!=0||b.due().signum()<=0)throw conflict("All orders must be served and an outstanding balance must exist before checkout.");dao.begin(s,b);notify(s);}
  @Transactional
  public Detail guest(String qr,UUID order,boolean start){var s=dao.guest(qr,order).orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"Bill not found for this order"));features.require(s.tenant(),"GUEST_ORDERING");if(start){dao.lock(s);begin(s);}return dao.detail(s);}
+ @Transactional
+ public Detail guestVisit(Scope s,boolean start){features.require(s.tenant(),"GUEST_ORDERING");if(start){dao.lock(s);begin(s);}return dao.detail(s);}
  @Transactional(readOnly=true)
  public Page page(UUID tenant,UUID branch,String filter,String search,int page,int size,Authentication auth){authorize(tenant,branch,auth);if(!Set.of("all","pending","paid").contains(filter)||search.length()>100||page<1||page>100000||size<1||size>50)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid bill filters");return dao.page(tenant,branch,filter,search.trim(),page,size);}
  @Transactional(readOnly=true)

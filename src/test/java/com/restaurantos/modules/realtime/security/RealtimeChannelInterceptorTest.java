@@ -40,7 +40,7 @@ class RealtimeChannelInterceptorTest {
         access = mock(TenantAccessDao.class);
         features = mock(TenantFeatureAccess.class);
         orders = mock(OrderQueryDao.class);
-        interceptor = new RealtimeChannelInterceptor(jwt, auth, admins, access, features, orders, mock(ServiceRequestDao.class));
+        interceptor = new RealtimeChannelInterceptor(jwt, auth, admins, access, features, orders, mock(ServiceRequestDao.class),mock(com.restaurantos.modules.dining.service.DiningSessionService.class));
     }
 
     private org.springframework.messaging.Message<byte[]> message(StompHeaderAccessor headers) {

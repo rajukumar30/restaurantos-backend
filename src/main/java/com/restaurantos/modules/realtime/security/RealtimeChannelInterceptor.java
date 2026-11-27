@@ -1,6 +1,7 @@
 package com.restaurantos.modules.realtime.security;
 
 import com.restaurantos.modules.auth.JwtService;
+import com.restaurantos.modules.dining.service.DiningSessionService;
 import com.restaurantos.modules.auth.repository.AuthDao;
 import com.restaurantos.modules.auth.repository.PlatformAdminAccessDao;
 import com.restaurantos.modules.platform.TenantFeatureAccess;
@@ -32,6 +33,7 @@ public class RealtimeChannelInterceptor implements ChannelInterceptor {
     private static final Pattern GUEST_SERVICE_TOPIC = Pattern.compile("^/topic/guest/tables/([0-9a-fA-F-]{36})/(service-requests|bill)$");
     private static final Pattern GUEST_MENU_TOPIC = Pattern.compile("^/topic/guest/branches/([0-9a-fA-F-]{36})/menu$");
     private final ServiceRequestDao serviceRequests;
+    private final DiningSessionService dining;
     private final OrderQueryDao orders;
     private final JwtService jwt;
     private final AuthDao auth;
@@ -40,8 +42,8 @@ public class RealtimeChannelInterceptor implements ChannelInterceptor {
     private final TenantFeatureAccess features;
 
     public RealtimeChannelInterceptor(JwtService jwt, AuthDao auth, PlatformAdminAccessDao admins,
-                                      TenantAccessDao access, TenantFeatureAccess features, OrderQueryDao orders, ServiceRequestDao serviceRequests) {
-        this.serviceRequests = serviceRequests;
+                                      TenantAccessDao access, TenantFeatureAccess features, OrderQueryDao orders, ServiceRequestDao serviceRequests,DiningSessionService dining) {
+        this.serviceRequests = serviceRequests;this.dining=dining;
         this.orders = orders;
         this.jwt = jwt;
         this.auth = auth;
@@ -87,6 +89,7 @@ public class RealtimeChannelInterceptor implements ChannelInterceptor {
                     throw new SecurityException("Authentication required");
                 if (headers.getSessionAttributes() == null) throw new SecurityException("Session unavailable");
                 headers.getSessionAttributes().put("guestQr", guestQr);
+                String session=headers.getFirstNativeHeader("X-Dining-Session");if(session!=null&&session.length()==64)headers.getSessionAttributes().put("diningSession",session);
                 return message;
             }
             try {
@@ -115,6 +118,8 @@ public class RealtimeChannelInterceptor implements ChannelInterceptor {
             if (guestService.matches()) {
                 Object qr = headers.getSessionAttributes() == null ? null : headers.getSessionAttributes().get("guestQr");
                 if (!(qr instanceof String qrToken)) throw new SecurityException("Guest table authentication required");
+                Object session=headers.getSessionAttributes().get("diningSession");
+                if(!(session instanceof String proof)||!dining.socketAllowed(qrToken,proof,UUID.fromString(guestService.group(1))))throw new SecurityException("Dining session required");
                 var tables = serviceRequests.tables(qrToken);
                 if (tables.isEmpty() || !tables.getFirst().id().equals(UUID.fromString(guestService.group(1)))
                         || !features.enabled(tables.getFirst().tenantId(), "bill".equals(guestService.group(2))?"GUEST_ORDERING":"SERVICE_REQUESTS"))
