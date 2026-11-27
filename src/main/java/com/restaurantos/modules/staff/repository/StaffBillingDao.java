@@ -50,4 +50,20 @@ public class StaffBillingDao {
    VALUES(?,?,?,?,?,?,?,?)
    """,paymentId,tenantId,branchId,orderId,amount,method,reference,actor);
  }
+ public void lockPaymentTable(UUID tenant,UUID branch,UUID order){
+  jdbc.query("""
+   SELECT rt.id FROM restaurant_tables rt JOIN restaurant_orders o ON o.table_id=rt.id AND o.tenant_id=rt.tenant_id AND o.branch_id=rt.branch_id
+   WHERE o.tenant_id=? AND o.branch_id=? AND o.id=? FOR UPDATE OF rt
+   """,(rs,row)->rs.getObject(1,UUID.class),tenant,branch,order);
+ }
+ public int settleVisit(UUID tenant,UUID branch,UUID order){
+  return jdbc.update("""
+   UPDATE table_visits v SET status='PAID',floor_paid_at=NOW(),floor_grace_until=NOW()+INTERVAL '5 minutes'
+   WHERE v.tenant_id=? AND v.branch_id=? AND v.status='OPEN'
+    AND v.id=(SELECT table_visit_id FROM restaurant_orders WHERE tenant_id=v.tenant_id AND branch_id=v.branch_id AND id=?)
+    AND EXISTS(SELECT 1 FROM restaurant_orders o WHERE o.table_visit_id=v.id AND o.tenant_id=v.tenant_id AND o.branch_id=v.branch_id AND o.status='SERVED')
+    AND NOT EXISTS(SELECT 1 FROM restaurant_orders o WHERE o.table_visit_id=v.id AND o.tenant_id=v.tenant_id AND o.branch_id=v.branch_id AND o.status<>'CANCELLED'
+      AND (o.status<>'SERVED' OR o.total_amount>COALESCE((SELECT SUM(p.amount) FROM restaurant_order_payments p WHERE p.tenant_id=o.tenant_id AND p.branch_id=o.branch_id AND p.order_id=o.id),0)))
+   """,tenant,branch,order);
+ }
 }

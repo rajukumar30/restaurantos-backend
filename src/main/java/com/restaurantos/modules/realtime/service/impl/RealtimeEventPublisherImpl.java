@@ -46,6 +46,11 @@ public class RealtimeEventPublisherImpl implements RealtimeEventPublisher {
                 try {
                     messaging.convertAndSend("/topic/tenants/" + event.tenantId()
                             + "/branches/" + event.branchId() + "/" + topic, event);
+                    // Floor invalidation contains no customer or payment details.
+                    if ("orders".equals(topic)||"billing".equals(topic)||"service-requests".equals(topic)){
+                        messaging.convertAndSend("/topic/tenants/"+event.tenantId()+"/branches/"+event.branchId()+"/floor",
+                            new RealtimeEvent(event.eventId(),"FLOOR_CHANGED",event.tenantId(),event.branchId(),event.resourceId(),1,event.occurredAt(),java.util.Map.of()));
+                    }
                     if ("menu".equals(topic)) {
                         messaging.convertAndSend("/topic/guest/branches/" + event.branchId() + "/menu", event);
                     }

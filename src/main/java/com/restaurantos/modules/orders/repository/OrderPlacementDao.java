@@ -56,7 +56,7 @@ public class OrderPlacementDao {
    """,rows);
  }
  public void lockTable(UUID tableId){
-  jdbc.queryForObject("SELECT id FROM restaurant_tables WHERE id=? FOR UPDATE",UUID.class,tableId);
+  jdbc.queryForObject("SELECT id FROM restaurant_tables WHERE id=? AND is_active=TRUE FOR UPDATE",UUID.class,tableId);
  }
  public List<UUID> activeVisits(QrTable table){
   return jdbc.query("""

@@ -36,6 +36,7 @@ public class StaffBillingServiceImpl implements StaffBillingService {
   String method=request.method().trim().toUpperCase(Locale.ROOT);
   if(!List.of("CASH","UPI","CARD","OTHER").contains(method))
    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Unsupported payment method");
+  dao.lockPaymentTable(tenantId,request.branchId(),orderId);
   List<BigDecimal> totals=dao.lockServedOrder(tenantId,request.branchId(),orderId);
   if(totals.isEmpty())
    throw new ResponseStatusException(HttpStatus.CONFLICT,"Only served orders can be paid");
@@ -46,6 +47,7 @@ public class StaffBillingServiceImpl implements StaffBillingService {
   String reference=request.reference()==null||request.reference().isBlank()?null:request.reference().trim();
   UUID paymentId=UUID.randomUUID();
   dao.insertPayment(paymentId,tenantId,request.branchId(),orderId,request.amount(),method,reference,userId);
+  dao.settleVisit(tenantId,request.branchId(),orderId);
   events.publishBillingAfterCommit(RealtimeEvent.orderChanged("PAYMENT_RECORDED",tenantId,request.branchId(),orderId));
   return Map.of("paymentId",paymentId,"remainingBalance",balance.subtract(request.amount()),"method",method);
  }

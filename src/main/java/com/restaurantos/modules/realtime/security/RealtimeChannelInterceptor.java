@@ -27,7 +27,7 @@ import java.util.regex.Pattern;
 @Component
 public class RealtimeChannelInterceptor implements ChannelInterceptor {
     private static final Pattern ORDER_TOPIC = Pattern.compile(
-        "^/topic/tenants/([0-9a-fA-F-]{36})/branches/([0-9a-fA-F-]{36})/(orders|service-requests|billing)$");
+        "^/topic/tenants/([0-9a-fA-F-]{36})/branches/([0-9a-fA-F-]{36})/(orders|service-requests|billing|floor)$");
     private static final Pattern GUEST_ORDER_TOPIC = Pattern.compile("^/topic/guest/orders/([0-9a-fA-F-]{36})$");
     private static final Pattern GUEST_SERVICE_TOPIC = Pattern.compile("^/topic/guest/tables/([0-9a-fA-F-]{36})/service-requests$");
     private static final Pattern GUEST_MENU_TOPIC = Pattern.compile("^/topic/guest/branches/([0-9a-fA-F-]{36})/menu$");
@@ -145,6 +145,10 @@ public class RealtimeChannelInterceptor implements ChannelInterceptor {
             UUID tenantId = UUID.fromString(match.group(1));
             UUID branchId = UUID.fromString(match.group(2));
             String topic = match.group(3);
+            if ("floor".equals(topic)) {
+                if(!access.activeBranchExists(tenantId,branchId)||!access.hasPermission(userId,tenantId,branchId,"floor:read")||!features.enabled(tenantId,"GUEST_ORDERING"))throw new SecurityException("Floor access denied");
+                return message;
+            }
             if (!access.activeBranchExists(tenantId, branchId)
                     || !access.hasPermission(userId, tenantId, branchId, "billing".equals(topic) ? "payments:read" : "orders:read")
                     || (!"billing".equals(topic) && !features.enabled(tenantId, "service-requests".equals(topic) ? "SERVICE_REQUESTS" : "GUEST_ORDERING")))
