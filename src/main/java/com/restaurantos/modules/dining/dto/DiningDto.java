@@ -11,6 +11,6 @@ public final class DiningDto{
  public record JoinRequest(@NotBlank @Pattern(regexp="[0-9]{6}") String code){}
  public record Code(String code,UUID visitId,Instant expiresAt){}
  public record Session(String token,UUID visitId,Instant expiresAt){}
- public record Visit(Scope scope,UUID sessionId,String status){}
+ public record Visit(Scope scope,UUID sessionId,String status,boolean verified){public Visit(Scope scope,UUID sessionId,String status){this(scope,sessionId,status,true);}}
  public record Active(Scope scope,String status,String hash,Instant expiresAt,int failures){}
 }

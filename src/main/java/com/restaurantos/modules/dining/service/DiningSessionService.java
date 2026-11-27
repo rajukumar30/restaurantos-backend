@@ -44,13 +44,17 @@ public class DiningSessionService{
  }
  @Transactional(propagation=Propagation.MANDATORY)
  public Visit require(String qr,String token,boolean lock,boolean openOnly){
+  var v=requireOrdering(qr,token,lock,openOnly);if(!v.verified())throw deny();return v;
+ }
+ @Transactional(propagation=Propagation.MANDATORY)
+ public Visit requireOrdering(String qr,String token,boolean lock,boolean openOnly){
   if(token==null||!token.matches("[0-9a-f]{64}"))throw deny();
   if(lock&&!dao.lockQr(qr))throw deny();
   var v=dao.find(qr,hash(token)).orElseThrow(this::deny);features.require(v.scope().tenant(),"GUEST_ORDERING");
   if(openOnly&&!"OPEN".equals(v.status()))throw new ResponseStatusException(HttpStatus.CONFLICT,"This table bill is being settled. Contact staff.");
   return v;
  }
- public boolean socketAllowed(String qr,String token,UUID table){return token!=null&&token.matches("[0-9a-f]{64}")&&dao.find(qr,hash(token)).filter(v->v.scope().table().equals(table)).isPresent();}
+ public boolean socketAllowed(String qr,String token,UUID table){return token!=null&&token.matches("[0-9a-f]{64}")&&dao.find(qr,hash(token)).filter(v->v.verified()&&v.scope().table().equals(table)).isPresent();}
  public void requireOrder(Visit v,UUID order){if(!dao.hasOrder(v,order))throw deny();}
  public String orderKey(Visit v,String key){
   if(key==null||!key.matches("[A-Za-z0-9_-]{16,100}"))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"A valid order submission key is required.");

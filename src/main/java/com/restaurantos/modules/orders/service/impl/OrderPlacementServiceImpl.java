@@ -25,7 +25,9 @@ public class OrderPlacementServiceImpl implements OrderPlacementService {
  }
  @Override
  @Transactional
- public OrderReceipt place(String qrToken,PlaceOrderRequest request,String idempotencyKey){
+ public OrderReceipt place(String qrToken,PlaceOrderRequest request,String idempotencyKey){return placeChecked(qrToken,request,idempotencyKey,null,null,null);}
+ @Override @Transactional
+ public OrderReceipt placeChecked(String qrToken,PlaceOrderRequest request,String idempotencyKey,UUID expectedVisit,UUID reservedId,BigDecimal expectedTotal){
   if(idempotencyKey!=null && !idempotencyKey.matches("[A-Za-z0-9_-]{16,100}"))
    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid idempotency key.");
   List<QrTable> tables=dao.findActiveTable(qrToken);
@@ -41,6 +43,7 @@ public class OrderPlacementServiceImpl implements OrderPlacementService {
    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"One or more selected menu items are no longer available.");
   BigDecimal total=lines.stream().map(line->line.unitPrice().multiply(BigDecimal.valueOf(line.quantity())))
     .reduce(BigDecimal.ZERO,BigDecimal::add);
+  if(expectedTotal!=null&&total.compareTo(expectedTotal)!=0)throw new ResponseStatusException(HttpStatus.CONFLICT,"Menu prices changed. Review and resubmit the order.");
   String requestHash=null;
   if(idempotencyKey!=null){
    StringBuilder canonical=new StringBuilder(request.customerName().trim()).append('|')
@@ -66,6 +69,7 @@ public class OrderPlacementServiceImpl implements OrderPlacementService {
   }
   List<UUID> visits=dao.activeVisits(table);
   UUID visitId;
+  if(expectedVisit!=null&&(visits.isEmpty()||!expectedVisit.equals(visits.getFirst())))throw new ResponseStatusException(HttpStatus.CONFLICT,"Dining visit changed. No order was placed.");
   if(visits.isEmpty()){
    visitId=UUID.randomUUID();
    String billNumber="B"+UUID.randomUUID().toString().replace("-","").substring(0,12).toUpperCase(Locale.ROOT);
@@ -75,8 +79,8 @@ public class OrderPlacementServiceImpl implements OrderPlacementService {
    if(!"OPEN".equals(dao.visitStatus(visitId)))
     throw new ResponseStatusException(HttpStatus.CONFLICT,"This table bill is being settled. Please contact the cashier.");
   }
-  UUID orderId=UUID.randomUUID();
-  String orderNumber="R"+UUID.randomUUID().toString().replace("-","").substring(0,9).toUpperCase(Locale.ROOT);
+  UUID orderId=reservedId==null?UUID.randomUUID():reservedId;
+  String orderNumber="R"+(reservedId==null?UUID.randomUUID():reservedId).toString().replace("-","").substring(0,9).toUpperCase(Locale.ROOT);
   String notes=request.notes()==null||request.notes().isBlank()?null:request.notes().trim();
   dao.createOrder(orderId,orderNumber,table,visitId,request.customerName().trim(),request.customerPhone(),notes,total,idempotencyKey,requestHash);
   dao.createOrderItems(table.tenantId(),orderId,lines);

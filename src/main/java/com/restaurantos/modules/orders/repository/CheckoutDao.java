@@ -77,7 +77,8 @@ public class CheckoutDao{
  public void begin(Scope s,Bill b){jdbc.update("""
  UPDATE table_visits SET status='PAYMENT_PENDING',checkout_amount=?,checkout_upi_id=?,checkout_merchant_name=?,checkout_requested_at=NOW()
  WHERE tenant_id=? AND branch_id=? AND id=? AND status='OPEN'
- """,b.due(),b.upiId(),b.merchantName(),s.tenant(),s.branch(),s.visit());}
+ """,b.due(),b.upiId(),b.merchantName(),s.tenant(),s.branch(),s.visit());
+ jdbc.update("UPDATE order_review_requests SET status='REJECTED',resolved_at=NOW(),resolution='Checkout started' WHERE tenant_id=? AND branch_id=? AND visit_id=? AND status='PENDING'",s.tenant(),s.branch(),s.visit());}
  public BigDecimal frozen(Scope s){return jdbc.queryForObject("SELECT checkout_amount FROM table_visits WHERE tenant_id=? AND branch_id=? AND id=?",BigDecimal.class,s.tenant(),s.branch(),s.visit());}
  public void resume(Scope s){jdbc.update("UPDATE table_visits SET status='OPEN',checkout_amount=NULL,checkout_upi_id=NULL,checkout_merchant_name=NULL,checkout_requested_at=NULL WHERE tenant_id=? AND branch_id=? AND id=? AND status='PAYMENT_PENDING'",s.tenant(),s.branch(),s.visit());}
  public Optional<Map<String,Object>> replay(Scope s,UUID key){return jdbc.queryForList("SELECT provider,provider_order_id,amount,visit_id FROM table_bill_payments WHERE tenant_id=? AND id=? AND status='PAID'",s.tenant(),key).stream().findFirst();}

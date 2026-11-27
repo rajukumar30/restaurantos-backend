@@ -1,11 +1,10 @@
 package com.restaurantos.modules.orders;
 
-import com.restaurantos.modules.dining.service.DiningSessionService;
+import com.restaurantos.modules.ordersecurity.service.OrderSecurityService;
 import org.springframework.transaction.annotation.Transactional;
 import com.restaurantos.common.api.ApiResponse;
 import com.restaurantos.modules.orders.dto.OrderDto.*;
 import com.restaurantos.modules.orders.service.OrderQueryService;
-import com.restaurantos.modules.orders.service.OrderPlacementService;
 import jakarta.validation.Valid;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -18,12 +17,10 @@ import org.springframework.format.annotation.DateTimeFormat;
 @RestController
 public class OrderController {
     private final OrderQueryService orderQueries;
-    private final OrderPlacementService orderPlacement;
-    private final DiningSessionService dining;
+    private final OrderSecurityService ordering;
 
-    public OrderController(OrderQueryService orderQueries,OrderPlacementService orderPlacement,DiningSessionService dining){
-        this.orderQueries=orderQueries;
-        this.orderPlacement=orderPlacement;this.dining=dining;
+    public OrderController(OrderQueryService orderQueries,OrderSecurityService ordering){
+        this.orderQueries=orderQueries;this.ordering=ordering;
     }
 
     @Transactional
@@ -32,12 +29,7 @@ public class OrderController {
             @Valid @RequestBody PlaceOrderRequest request,
             @RequestHeader(value="Idempotency-Key",required=false) String idempotencyKey,
             @RequestHeader(value="X-Dining-Session",required=false) String session,Authentication authentication){
-        var visit=dining.require(qrToken,session,true,true);
-        String key=dining.orderKey(visit,idempotencyKey);
-        dining.checkOrderLimits(visit,request.items().stream().mapToLong(line->line.quantity()).sum(),request.items().size(),key);
-        var receipt=orderPlacement.place(qrToken,request,key);
-        dining.recordOrder(visit,receipt.orderId());
-        return ApiResponse.success("Order placed successfully",receipt);
+        return ApiResponse.success("Order submitted",ordering.submit(qrToken,session,request,idempotencyKey));
     }
 
     @GetMapping("/api/v1/public/qr/{qrToken}/orders/{orderId}")

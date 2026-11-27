@@ -18,8 +18,14 @@ public class OrderQueryDao {
    JOIN tenants t ON t.id=o.tenant_id
    WHERE o.id=? AND rt.qr_token=? AND rt.is_active=TRUE
      AND b.status='ACTIVE' AND t.status='ACTIVE'
+   UNION ALL
+   SELECT r.order_number,CASE WHEN r.status='PENDING' AND (v.status<>'OPEN' OR r.expires_at<=NOW()) THEN 'CANCELLED' WHEN r.status='PENDING' THEN 'AWAITING_REVIEW' ELSE 'CANCELLED' END,r.total_amount,r.created_at
+   FROM order_review_requests r JOIN restaurant_tables rt ON rt.id=r.table_id AND rt.tenant_id=r.tenant_id AND rt.branch_id=r.branch_id
+   JOIN table_visits v ON v.id=r.visit_id AND v.tenant_id=r.tenant_id AND v.branch_id=r.branch_id AND v.table_id=r.table_id
+   JOIN tenants t ON t.id=r.tenant_id JOIN branches b ON b.id=r.branch_id AND b.tenant_id=r.tenant_id
+   WHERE r.id=? AND rt.qr_token=? AND rt.is_active AND t.status='ACTIVE' AND b.status='ACTIVE' AND r.status<>'APPROVED'
    """,(rs,row)->new PublicOrderStatus(rs.getString("order_number"),rs.getString("status"),
-    rs.getBigDecimal("total_amount"),rs.getTimestamp("created_at").toInstant()),orderId,qrToken);
+    rs.getBigDecimal("total_amount"),rs.getTimestamp("created_at").toInstant()),orderId,qrToken,orderId,qrToken);
  }
  public List<OrderSummary> list(UUID tenantId,UUID branchId){
   return jdbc.query("""

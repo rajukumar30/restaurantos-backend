@@ -37,6 +37,7 @@ public class FloorDao {
  public void start(UUID visit){jdbc.update("UPDATE table_visits SET floor_cleaning_started_at=NOW() WHERE id=?",visit);}
  public void close(UUID tenant,UUID branch,UUID table,UUID visit){
   jdbc.update("UPDATE table_visits SET status='CLOSED',closed_at=NOW(),floor_cleaned_at=NOW() WHERE id=?",visit);
+  jdbc.update("UPDATE order_review_requests SET status='REJECTED',resolved_at=NOW(),resolution='Visit closed' WHERE tenant_id=? AND branch_id=? AND visit_id=? AND status='PENDING'",tenant,branch,visit);
   jdbc.update("UPDATE service_requests SET status='CANCELLED',cancelled_at=NOW() WHERE tenant_id=? AND branch_id=? AND table_id=? AND status IN ('REQUESTED','ON_THE_WAY')",tenant,branch,table);
  }
  public void audit(UUID tenant,UUID branch,UUID table,UUID visit,UUID actor,String action){jdbc.update("INSERT INTO floor_events(tenant_id,branch_id,table_id,visit_id,actor_id,action) VALUES(?,?,?,?,?,?)",tenant,branch,table,visit,actor,action);}
