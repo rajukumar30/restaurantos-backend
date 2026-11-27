@@ -23,6 +23,11 @@ public class CheckoutController{
  @Transactional
  @PostMapping("/api/v1/public/qr/{qr}/visit/bill/checkout")
  public ApiResponse<Detail> currentCheckout(@PathVariable String qr,@RequestHeader(value="X-Dining-Session",required=false) String session){return ApiResponse.success("Checkout requested",service.guestVisit(dining.require(qr,session,true,false).scope(),true));}
+ @Transactional
+ @PostMapping("/api/v1/public/qr/{qr}/visit/bill/disputes")
+ public ApiResponse<Detail> report(@PathVariable String qr,@RequestHeader(value="X-Dining-Session",required=false) String session,@Valid @RequestBody Report r){var v=dining.require(qr,session,true,false);return ApiResponse.success("Order flagged for review",service.report(v.scope(),v.sessionId(),r));}
+ @PostMapping("/api/v1/tenants/{tenant}/checkout/{visit}/disputes/{dispute}/resolve")
+ public ApiResponse<Detail> resolve(@PathVariable UUID tenant,@PathVariable UUID visit,@PathVariable UUID dispute,@Valid @RequestBody Resolve r,Authentication auth){return ApiResponse.success("Order dispute resolved",service.resolve(tenant,visit,dispute,r,auth));}
  @GetMapping("/api/v1/tenants/{tenant}/checkout")
  public ApiResponse<Page> page(@PathVariable UUID tenant,@RequestParam UUID branchId,@RequestParam(defaultValue="pending") String filter,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="1") int page,@RequestParam(defaultValue="20") int size,Authentication auth){return ApiResponse.success("Bills loaded",service.page(tenant,branchId,filter,search,page,size,auth));}
  @GetMapping("/api/v1/tenants/{tenant}/checkout/{visit}")

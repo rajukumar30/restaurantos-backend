@@ -7,9 +7,14 @@ public final class CheckoutDto {
  private CheckoutDto(){}
  public record Merchant(@Size(max=150) String upiId,@Size(max=100) String merchantName){}
  public record Bill(UUID visitId,UUID tableId,String tableName,String billNumber,String status,Instant openedAt,
- BigDecimal total,BigDecimal paid,BigDecimal due,int orderCount,int unfinished,String upiId,String merchantName,Instant requestedAt){}
+ BigDecimal total,BigDecimal paid,BigDecimal due,int orderCount,int unfinished,String upiId,String merchantName,Instant requestedAt,int disputes){
+ public Bill(UUID visitId,UUID tableId,String tableName,String billNumber,String status,Instant openedAt,BigDecimal total,BigDecimal paid,BigDecimal due,int orderCount,int unfinished,String upiId,String merchantName,Instant requestedAt){this(visitId,tableId,tableName,billNumber,status,openedAt,total,paid,due,orderCount,unfinished,upiId,merchantName,requestedAt,0);}
+ }
  public record Line(String orderNumber,String itemName,int quantity,BigDecimal lineTotal){}
- public record Detail(Bill bill,List<Line> items){}
+ public record Detail(Bill bill,List<Line> items,List<Dispute> disputes){public Detail(Bill bill,List<Line> items){this(bill,items,List.of());}}
+ public record Dispute(UUID id,String orderNumber,String orderStatus,String status,String reason,String resolution,Instant createdAt){}
+ public record Report(@NotBlank @Size(max=40) String orderNumber,@NotBlank @Size(max=250) String reason){}
+ public record Resolve(@NotNull UUID branchId,@NotBlank @Size(max=10) String action,@NotBlank @Size(max=250) String reason){}
  public record Page(List<Bill> bills,long total,int page,int size){}
  public record VisitAction(@NotNull UUID branchId){}
  public record Confirm(@NotNull UUID branchId,@NotNull UUID paymentKey,@NotNull @DecimalMin("0.01") @Digits(integer=10,fraction=2) BigDecimal amount,

@@ -54,7 +54,7 @@ public class DiningSessionService{
  public void requireOrder(Visit v,UUID order){if(!dao.hasOrder(v,order))throw deny();}
  public String orderKey(Visit v,String key){
   if(key==null||!key.matches("[A-Za-z0-9_-]{16,100}"))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"A valid order submission key is required.");
-  return hash(v.scope().visit()+":"+v.sessionId()+":"+key);
+  return hash(v.scope().visit()+":"+key);
  }
  public void checkOrderLimits(Visit v,long units,int lines,String key){
   if(dao.repeated(v,key))return;

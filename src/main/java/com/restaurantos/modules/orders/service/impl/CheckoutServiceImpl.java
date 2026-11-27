@@ -23,7 +23,7 @@ public class CheckoutServiceImpl implements CheckoutService{
  private Scope scope(UUID tenant,UUID branch,UUID visit){return dao.scope(tenant,branch,visit).orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"Bill not found"));}
  private UUID authorize(UUID tenant,UUID branch,Authentication auth){UUID actor=access.requirePermission(auth,tenant,branch,"payments:read");access.requireBranchInTenant(tenant,branch);features.require(tenant,"GUEST_ORDERING");if(!billing.cashier(tenant,branch,actor))throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Cashier, manager or owner access required");return actor;}
  private void notify(Scope s){events.publishBillingAfterCommit(new RealtimeEvent(UUID.randomUUID(),"BILL_CHANGED",s.tenant(),s.branch(),s.visit(),1,Instant.now(),Map.of("tableId",s.table().toString())));}
- private void begin(Scope s){var b=dao.bill(s);if("PAYMENT_PENDING".equals(b.status()))return;if(!"OPEN".equals(b.status())||b.orderCount()==0||b.unfinished()!=0||b.due().signum()<=0)throw conflict("All orders must be served and an outstanding balance must exist before checkout.");dao.begin(s,b);notify(s);}
+ private void begin(Scope s){var b=dao.bill(s);if(b.disputes()>0)throw conflict("An order is disputed. Staff must review it before payment.");if("PAYMENT_PENDING".equals(b.status()))return;if(!"OPEN".equals(b.status())||b.orderCount()==0||b.unfinished()!=0||b.due().signum()<=0)throw conflict("All orders must be served and an outstanding balance must exist before checkout.");dao.begin(s,b);notify(s);}
  @Transactional
  public Detail guest(String qr,UUID order,boolean start){var s=dao.guest(qr,order).orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"Bill not found for this order"));features.require(s.tenant(),"GUEST_ORDERING");if(start){dao.lock(s);begin(s);}return dao.detail(s);}
  @Transactional
@@ -40,13 +40,36 @@ public class CheckoutServiceImpl implements CheckoutService{
   String method=r.method().trim().toUpperCase(Locale.ROOT),ref=r.reference()==null||r.reference().isBlank()?null:r.reference().trim().toUpperCase(Locale.ROOT);
   if(!Set.of("CASH","UPI","CARD").contains(method)||("UPI".equals(method)||"CARD".equals(method))&&ref==null)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Enter a verified transaction reference for UPI or card.");
   var old=dao.replay(s,r.paymentKey());if(old.isPresent()){var p=old.get();if(!visit.equals(p.get("visit_id"))||!Objects.equals(p.get("provider"),"MANUAL_"+method)||!Objects.equals(p.get("provider_order_id"),ref)||((BigDecimal)p.get("amount")).compareTo(r.amount())!=0)throw conflict("Payment key already used");return dao.detail(s);}
-  var b=dao.bill(s);var frozen=dao.frozen(s);
+  var b=dao.bill(s);if(b.disputes()>0)throw conflict("Resolve disputed orders before confirming payment.");var frozen=dao.frozen(s);
   if(!"PAYMENT_PENDING".equals(b.status())||b.unfinished()!=0||b.due().signum()<=0||frozen==null||frozen.compareTo(b.due())!=0||b.due().compareTo(r.amount())!=0)throw conflict("The bill amount or status changed. Refresh before collecting payment.");
   if(dao.referenceUsed(s,method,ref))throw conflict("This transaction reference has already been recorded.");
   var allocations=dao.allocations(s);if(allocations.stream().anyMatch(a->a.due().signum()<0)||allocations.stream().map(Allocation::due).reduce(BigDecimal.ZERO,BigDecimal::add).compareTo(b.due())!=0)throw conflict("Payment balances changed. Refresh before collecting.");
   dao.record(s,r.paymentKey(),method,ref,r.amount());boolean first=true;
   for(var a:allocations)if(a.due().signum()>0){dao.allocate(s,a,method,first?ref:null,actor);first=false;}
   dao.settle(s);notify(s);return dao.detail(s);
+ }
+ @Transactional
+ public Detail report(Scope s,UUID session,Report r){
+  features.require(s.tenant(),"GUEST_ORDERING");dao.lock(s);var b=dao.bill(s);
+  if(!Set.of("OPEN","PAYMENT_PENDING").contains(b.status()))throw conflict("Visit already settled. Ask staff about a refund or correction.");
+  if(!dao.report(s,session,r.orderNumber().trim(),r.reason().trim()))throw conflict("Order does not belong to this visit or is cancelled.");
+  notify(s);return dao.detail(s);
+ }
+ @Transactional
+ public Detail resolve(UUID tenant,UUID visit,UUID dispute,Resolve r,Authentication auth){
+  UUID actor=authorize(tenant,r.branchId(),auth);access.requirePermission(auth,tenant,r.branchId(),"staff:manage");
+  var s=scope(tenant,r.branchId(),visit);dao.lock(s);var b=dao.bill(s);
+  if(!Set.of("OPEN","PAYMENT_PENDING").contains(b.status()))throw conflict("Settled bills require a separate refund process.");
+  UUID order=dao.disputedOrder(s,dispute).orElseThrow(()->conflict("Dispute is no longer open."));
+  String action=r.action().trim().toUpperCase(Locale.ROOT);
+  if("VOID".equals(action)){
+   if(!"OPEN".equals(b.status()))throw conflict("Verify no transfer is in progress, then reopen checkout before voiding an order.");
+   if(!dao.voidUnpaidOrder(s,order))throw conflict("An already-paid order cannot be voided here.");
+   dao.resolve(s,dispute,actor,"VOIDED",r.reason().trim());
+   events.publishAfterCommit(new RealtimeEvent(UUID.randomUUID(),"ORDER_STATUS_CHANGED",s.tenant(),s.branch(),order,1,Instant.now(),Map.of("tableId",s.table().toString())));
+  }else if("KEEP".equals(action)){dao.resolve(s,dispute,actor,"REJECTED",r.reason().trim());}
+  else throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Choose VOID or KEEP.");
+  notify(s);return dao.detail(s);
  }
  @Transactional
  public Merchant merchant(UUID tenant,UUID branch,Merchant update,Authentication auth){

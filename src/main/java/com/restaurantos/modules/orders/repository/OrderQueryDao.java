@@ -78,6 +78,7 @@ public class OrderQueryDao {
   return jdbc.update("""
    UPDATE restaurant_orders SET status=?,updated_at=NOW()
    WHERE tenant_id=? AND branch_id=? AND id=? AND status=?
+   AND NOT EXISTS(SELECT 1 FROM order_disputes d WHERE d.order_id=restaurant_orders.id AND d.status='OPEN')
    """,status,tenantId,branchId,orderId,switch(status){case "ACCEPTED"->"NEW";case "PREPARING"->"ACCEPTED";case "READY"->"PREPARING";case "SERVED"->"READY";case "CANCELLED"->"NEW";default->"__INVALID__";});
  }
  public void recordServed(UUID tenantId,UUID branchId,UUID orderId,UUID actorId){
