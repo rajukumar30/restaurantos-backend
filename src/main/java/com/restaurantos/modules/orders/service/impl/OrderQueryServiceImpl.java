@@ -69,13 +69,12 @@ public class OrderQueryServiceImpl implements OrderQueryService {
   String status=request.status().trim().toUpperCase(Locale.ROOT);
   if(!List.of("ACCEPTED","PREPARING","READY","SERVED","CANCELLED").contains(status))
    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Unsupported order status.");
-  if(dao.updateStatus(tenantId,request.branchId(),orderId,status)==0)
-   throw new ResponseStatusException(HttpStatus.CONFLICT,"Order status changed or this transition is not allowed.");
+  UUID table=dao.updateStatusReturningTable(tenantId,request.branchId(),orderId,status)
+   .orElseThrow(()->new ResponseStatusException(HttpStatus.CONFLICT,"Order status changed or this transition is not allowed."));
   if("SERVED".equals(status)){
    UUID actorId=(UUID)auth.getPrincipal();
    dao.recordServed(tenantId,request.branchId(),orderId,actorId);
   }
-  UUID table=dao.orderTable(tenantId,request.branchId(),orderId);
   events.publishAfterCommit(new RealtimeEvent(UUID.randomUUID(),"ORDER_STATUS_CHANGED",tenantId,request.branchId(),orderId,1,Instant.now(),table==null?Map.of():Map.of("tableId",table.toString())));
   return new OrderStatusUpdated(orderId,status);
  }

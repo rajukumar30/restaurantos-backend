@@ -80,12 +80,13 @@ public class OrderQueryDao {
     rs.getInt("line_count"),rs.getInt("item_count"),rs.getString("items_summary"),
     rs.getTimestamp("created_at").toInstant()),tenantId,branchId,orderId);
  }
- public int updateStatus(UUID tenantId,UUID branchId,UUID orderId,String status){
-  return jdbc.update("""
+ public Optional<UUID> updateStatusReturningTable(UUID tenantId,UUID branchId,UUID orderId,String status){
+  return jdbc.query("""
    UPDATE restaurant_orders SET status=?,updated_at=NOW()
    WHERE tenant_id=? AND branch_id=? AND id=? AND status=?
    AND NOT EXISTS(SELECT 1 FROM order_disputes d WHERE d.order_id=restaurant_orders.id AND d.status='OPEN')
-   """,status,tenantId,branchId,orderId,switch(status){case "ACCEPTED"->"NEW";case "PREPARING"->"ACCEPTED";case "READY"->"PREPARING";case "SERVED"->"READY";case "CANCELLED"->"NEW";default->"__INVALID__";});
+   RETURNING table_id
+   """,(rs,row)->rs.getObject(1,UUID.class),status,tenantId,branchId,orderId,switch(status){case "ACCEPTED"->"NEW";case "PREPARING"->"ACCEPTED";case "READY"->"PREPARING";case "SERVED"->"READY";case "CANCELLED"->"NEW";default->"__INVALID__";}).stream().findFirst();
  }
  public void recordServed(UUID tenantId,UUID branchId,UUID orderId,UUID actorId){
   jdbc.update("""
@@ -117,7 +118,8 @@ public class OrderQueryDao {
     OR EXISTS(SELECT 1 FROM restaurant_order_items oi WHERE oi.tenant_id=o.tenant_id AND oi.order_id=o.id AND strpos(lower(oi.item_name),lower(?))>0))
     """);args.add(search);args.add(search);args.add(search);
   }
-  long total=jdbc.queryForObject("SELECT COUNT(*) "+where,Long.class,args.toArray());
+  // Without search, the grouped status counts already contain the exact filtered total.
+  long total=search.isEmpty()?counts.getOrDefault(q.status(),0L):jdbc.queryForObject("SELECT COUNT(*) "+where,Long.class,args.toArray());
   int page=Math.min(q.page(),Math.max(1,(int)Math.ceil((double)total/q.size())));
   args.add(q.size());args.add((long)(page-1)*q.size());
   // First select the bounded page; only aggregate line items for those orders.
