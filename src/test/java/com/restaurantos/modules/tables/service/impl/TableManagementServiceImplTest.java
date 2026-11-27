@@ -30,6 +30,16 @@ class TableManagementServiceImplTest {
   UUID tenant=UUID.randomUUID(),branch=UUID.randomUUID(),table=UUID.randomUUID();
   assertThrows(ResponseStatusException.class,()->service.update(tenant,table,new UpdateTableRequest(branch,"Table 2",4,false),auth));
  }
+ @Test void updateReturnsSavedTableWithoutSecondRead(){
+  UUID tenant=UUID.randomUUID(),branch=UUID.randomUUID(),table=UUID.randomUUID();
+  var req=new UpdateTableRequest(branch,"Table 2",4,true);
+  var saved=new RestaurantTable(table,"2","Table 2",4,"existing-token",true);
+  when(dao.updateReturning(tenant,branch,table,req)).thenReturn(java.util.Optional.of(saved));
+  assertEquals(saved,service.update(tenant,table,req,auth));
+  verify(dao,never()).find(any(),any(),any());
+  verify(access).requirePermission(auth,tenant,branch,"tables:manage");
+  verify(access).requireBranchInTenant(tenant,branch);
+ }
  @Test void invalidQrTokenRejected(){
   assertThrows(ResponseStatusException.class,()->service.publicMenu(UUID.randomUUID(),"invalid"));
  }

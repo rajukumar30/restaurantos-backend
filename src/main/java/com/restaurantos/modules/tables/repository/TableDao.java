@@ -31,12 +31,13 @@ public class TableDao {
    VALUES(?,?,?,?,?,?,?)
    """,id,tenantId,branchId,number,displayName,capacity,token);
  }
- public int update(UUID tenantId,UUID branchId,UUID tableId,UpdateTableRequest request){
-  return jdbc.update("""
+ public Optional<RestaurantTable> updateReturning(UUID tenantId,UUID branchId,UUID tableId,UpdateTableRequest request){
+  return jdbc.query("""
    UPDATE restaurant_tables SET display_name=?,seating_capacity=?,is_active=?,updated_at=NOW()
    WHERE tenant_id=? AND branch_id=? AND id=?
    AND NOT EXISTS(SELECT 1 FROM table_visits v WHERE v.tenant_id=restaurant_tables.tenant_id AND v.branch_id=restaurant_tables.branch_id AND v.table_id=restaurant_tables.id AND v.status IN ('OPEN','PAYMENT_PENDING','PAID') AND (?=false OR COALESCE(v.floor_guest_count,0)>?))
-   """,request.displayName().trim(),request.seatingCapacity(),request.active(),tenantId,branchId,tableId,request.active(),request.seatingCapacity());
+   RETURNING id,table_number,display_name,seating_capacity,qr_token,is_active
+   """,(rs,row)->mapTable(rs),request.displayName().trim(),request.seatingCapacity(),request.active(),tenantId,branchId,tableId,request.active(),request.seatingCapacity()).stream().findFirst();
  }
  public RestaurantTable find(UUID tenantId,UUID branchId,UUID tableId){
   return jdbc.queryForObject("""

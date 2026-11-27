@@ -42,9 +42,8 @@ public class TableManagementServiceImpl implements TableManagementService {
  @Transactional
  public RestaurantTable update(UUID tenantId,UUID tableId,UpdateTableRequest request,Authentication auth){
   authorize(auth,tenantId,request.branchId(),"tables:manage");
-  if(dao.update(tenantId,request.branchId(),tableId,request)==0)
-   throw new ResponseStatusException(HttpStatus.CONFLICT,"Table not found or has an active visit. Finish the visit before deactivating or reducing capacity.");
-  return dao.find(tenantId,request.branchId(),tableId);
+  return dao.updateReturning(tenantId,request.branchId(),tableId,request)
+   .orElseThrow(()->new ResponseStatusException(HttpStatus.CONFLICT,"Table not found or has an active visit. Finish the visit before deactivating or reducing capacity."));
  }
  @Transactional(readOnly=true)
  public PublicTableMenu publicMenu(UUID tenantId,String qrToken){
