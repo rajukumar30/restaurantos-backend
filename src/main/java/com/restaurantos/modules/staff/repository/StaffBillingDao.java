@@ -34,7 +34,8 @@ public class StaffBillingDao {
  public List<BigDecimal> lockServedOrder(UUID tenantId,UUID branchId,UUID orderId){
   return jdbc.query("""
    SELECT total_amount FROM restaurant_orders
-   WHERE tenant_id=? AND branch_id=? AND id=? AND status='SERVED' FOR UPDATE
+   WHERE tenant_id=? AND branch_id=? AND id=? AND status='SERVED'
+    AND (table_visit_id IS NULL OR EXISTS(SELECT 1 FROM table_visits v WHERE v.id=restaurant_orders.table_visit_id AND v.status='OPEN')) FOR UPDATE
    """,(rs,i)->rs.getBigDecimal(1),tenantId,branchId,orderId);
  }
  public BigDecimal paid(UUID tenantId,UUID branchId,UUID orderId){

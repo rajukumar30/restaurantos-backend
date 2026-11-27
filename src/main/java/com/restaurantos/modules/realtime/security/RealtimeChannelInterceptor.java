@@ -29,7 +29,7 @@ public class RealtimeChannelInterceptor implements ChannelInterceptor {
     private static final Pattern ORDER_TOPIC = Pattern.compile(
         "^/topic/tenants/([0-9a-fA-F-]{36})/branches/([0-9a-fA-F-]{36})/(orders|service-requests|billing|floor)$");
     private static final Pattern GUEST_ORDER_TOPIC = Pattern.compile("^/topic/guest/orders/([0-9a-fA-F-]{36})$");
-    private static final Pattern GUEST_SERVICE_TOPIC = Pattern.compile("^/topic/guest/tables/([0-9a-fA-F-]{36})/service-requests$");
+    private static final Pattern GUEST_SERVICE_TOPIC = Pattern.compile("^/topic/guest/tables/([0-9a-fA-F-]{36})/(service-requests|bill)$");
     private static final Pattern GUEST_MENU_TOPIC = Pattern.compile("^/topic/guest/branches/([0-9a-fA-F-]{36})/menu$");
     private final ServiceRequestDao serviceRequests;
     private final OrderQueryDao orders;
@@ -117,7 +117,7 @@ public class RealtimeChannelInterceptor implements ChannelInterceptor {
                 if (!(qr instanceof String qrToken)) throw new SecurityException("Guest table authentication required");
                 var tables = serviceRequests.tables(qrToken);
                 if (tables.isEmpty() || !tables.getFirst().id().equals(UUID.fromString(guestService.group(1)))
-                        || !features.enabled(tables.getFirst().tenantId(), "SERVICE_REQUESTS"))
+                        || !features.enabled(tables.getFirst().tenantId(), "bill".equals(guestService.group(2))?"GUEST_ORDERING":"SERVICE_REQUESTS"))
                     throw new SecurityException("Guest service subscription denied");
                 return message;
             }
