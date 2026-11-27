@@ -38,12 +38,6 @@ public class OrderPlacementServiceImpl implements OrderPlacementService {
   for(OrderLineRequest line:request.items())quantities.merge(line.menuItemId(),line.quantity(),Integer::sum);
   if(quantities.values().stream().anyMatch(quantity->quantity>20))
    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"A maximum of 20 units per menu item can be ordered.");
-  List<ValidatedOrderLine> lines=dao.findAvailableItems(table.tenantId(),table.branchId(),quantities);
-  if(lines.size()!=quantities.size()||!lines.stream().map(ValidatedOrderLine::menuItemId).collect(java.util.stream.Collectors.toSet()).equals(quantities.keySet()))
-   throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"One or more selected menu items are no longer available.");
-  BigDecimal total=lines.stream().map(line->line.unitPrice().multiply(BigDecimal.valueOf(line.quantity())))
-    .reduce(BigDecimal.ZERO,BigDecimal::add);
-  if(expectedTotal!=null&&total.compareTo(expectedTotal)!=0)throw new ResponseStatusException(HttpStatus.CONFLICT,"Menu prices changed. Review and resubmit the order.");
   String requestHash=null;
   if(idempotencyKey!=null){
    StringBuilder canonical=new StringBuilder(request.customerName().trim()).append('|')
@@ -56,17 +50,27 @@ public class OrderPlacementServiceImpl implements OrderPlacementService {
     requestHash=HexFormat.of().formatHex(digest);
    }catch(NoSuchAlgorithmException ex){throw new IllegalStateException(ex);}
   }
-  dao.lockTable(table.tableId());
+  // Resolve accepted retries before reading mutable menu availability or prices.
   if(idempotencyKey!=null){
+   dao.lockTable(table.tableId());
    var existing=dao.findSubmission(table,idempotencyKey);
    if(!existing.isEmpty()){
     var old=existing.getFirst();
+    if(expectedVisit!=null&&!expectedVisit.equals(old.get("visitId")))
+     throw new ResponseStatusException(HttpStatus.CONFLICT,"Dining visit changed. No order was placed.");
     if(!Objects.equals(old.get("requestHash"),requestHash))
      throw new ResponseStatusException(HttpStatus.CONFLICT,"This submission key was already used for a different order.");
     return new OrderReceipt((UUID)old.get("orderId"),(String)old.get("orderNumber"),
       table.displayName(),(BigDecimal)old.get("totalAmount"),(String)old.get("status"));
    }
   }
+  List<ValidatedOrderLine> lines=dao.findAvailableItems(table.tenantId(),table.branchId(),quantities);
+  if(lines.size()!=quantities.size()||!lines.stream().map(ValidatedOrderLine::menuItemId).collect(java.util.stream.Collectors.toSet()).equals(quantities.keySet()))
+   throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"One or more selected menu items are no longer available.");
+  BigDecimal total=lines.stream().map(line->line.unitPrice().multiply(BigDecimal.valueOf(line.quantity())))
+    .reduce(BigDecimal.ZERO,BigDecimal::add);
+  if(expectedTotal!=null&&total.compareTo(expectedTotal)!=0)throw new ResponseStatusException(HttpStatus.CONFLICT,"Menu prices changed. Review and resubmit the order.");
+  if(idempotencyKey==null)dao.lockTable(table.tableId());
   List<UUID> visits=dao.activeVisits(table);
   UUID visitId;
   if(expectedVisit!=null&&(visits.isEmpty()||!expectedVisit.equals(visits.getFirst())))throw new ResponseStatusException(HttpStatus.CONFLICT,"Dining visit changed. No order was placed.");

@@ -46,7 +46,7 @@ class OrderPlacementServiceImplTest {
   UUID original=UUID.randomUUID();
   String key="fixed-idempotency-key-1234";
   when(dao.findActiveTable("qr")).thenReturn(List.of(table));
-  when(dao.findAvailableItems(tenant,branch,Map.of(item,2))).thenReturn(List.of(new ValidatedOrderLine(item,"Tea",new BigDecimal("30"),2)));
+  // Item is now sold out, but a retry must return the accepted order.
   String canonical="Customer|+919876543210|"+ "|" +item+":2";
   String hash;
   try{
@@ -59,8 +59,24 @@ class OrderPlacementServiceImplTest {
   OrderReceipt receipt=service.place("qr",request(List.of(new OrderLineRequest(item,2))),key);
   assertEquals(original,receipt.orderId());
   assertEquals("R123",receipt.orderNumber());
+  verify(dao,never()).findAvailableItems(any(),any(),anyMap());
   verify(dao,never()).createOrder(any(),any(),any(),any(),any(),any(),any(),any(),any(),any());
   verify(dao,never()).createOrderItems(any(),any(),any());
+ }
+ @Test void retryReturnsAcceptedReceiptEvenWhenExpectedPriceChanged(){
+  QrTable table=new QrTable(tableId,tenant,branch,"Table 1");UUID original=UUID.randomUUID(),visit=UUID.randomUUID();
+  String key="fixed-idempotency-key-1234";
+  when(dao.findActiveTable("qr")).thenReturn(List.of(table));
+  String canonical="Customer|+919876543210||"+item+":2";
+  String hash;
+  try{hash=HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(canonical.getBytes(java.nio.charset.StandardCharsets.UTF_8)));}catch(java.security.NoSuchAlgorithmException ex){throw new AssertionError(ex);}
+  when(dao.findSubmission(table,key)).thenReturn(List.of(Map.of("orderId",original,"orderNumber","R123","totalAmount",new BigDecimal("60"),"status","NEW","requestHash",hash,"visitId",visit)));
+  var receipt=service.placeChecked("qr",request(List.of(new OrderLineRequest(item,2))),key,visit,null,new BigDecimal("100"));
+  assertEquals(original,receipt.orderId());assertEquals(new BigDecimal("60"),receipt.totalAmount());
+  verify(dao,never()).findAvailableItems(any(),any(),anyMap());
+  assertThrows(ResponseStatusException.class,()->service.placeChecked("qr",request(List.of(new OrderLineRequest(item,2))),key,UUID.randomUUID(),null,null));
+  assertThrows(ResponseStatusException.class,()->service.placeChecked("qr",request(List.of(new OrderLineRequest(item,3))),key,visit,null,null));
+  verify(dao,never()).createOrder(any(),any(),any(),any(),any(),any(),any(),any(),any(),any());
  }
  @Test void multiItemCartUsesOneValidationAndOneBatchInsert(){
   QrTable table=new QrTable(tableId,tenant,branch,"Table 1");

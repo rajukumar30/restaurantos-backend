@@ -77,10 +77,10 @@ public class OrderPlacementDao {
  public List<Map<String,Object>> findSubmission(QrTable table,String key){
   return jdbc.queryForList("""
    SELECT id AS "orderId",order_number AS "orderNumber",total_amount AS "totalAmount",
-          status,request_hash AS "requestHash"
+          status,request_hash AS "requestHash",table_visit_id AS "visitId"
    FROM restaurant_orders
-   WHERE tenant_id=? AND table_id=? AND idempotency_key=?
-   """,table.tenantId(),table.tableId(),key);
+   WHERE tenant_id=? AND branch_id=? AND table_id=? AND idempotency_key=?
+   """,table.tenantId(),table.branchId(),table.tableId(),key);
  }
  public void createOrder(UUID orderId,String orderNumber,QrTable table,UUID visitId,
                          String name,String phone,String notes,BigDecimal total,String key,String requestHash){
