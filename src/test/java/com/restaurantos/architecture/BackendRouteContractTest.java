@@ -27,6 +27,7 @@ class BackendRouteContractTest {
             "PUT /api/v1/platform/restaurants/{tenantId}/features/{featureKey}",
             "GET /api/v1/tenants/{tenantId}/staff",
             "POST /api/v1/tenants/{tenantId}/staff",
+            "PATCH /api/v1/tenants/{tenantId}/staff/{userId}",
             "POST /api/v1/tenants/{tenantId}/bills/{visitId}/receipt-link",
             "GET /api/v1/public/receipts/{token}.pdf"
         );
