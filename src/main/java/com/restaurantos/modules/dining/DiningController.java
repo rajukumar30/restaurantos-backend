@@ -2,6 +2,7 @@ package com.restaurantos.modules.dining;
 import com.restaurantos.common.api.ApiResponse;
 import com.restaurantos.modules.dining.dto.DiningDto.*;
 import com.restaurantos.modules.dining.service.DiningSessionService;
+import com.restaurantos.modules.dining.service.DiningSeatingService;
 import jakarta.validation.Valid;
 import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
@@ -9,7 +10,10 @@ import org.springframework.web.bind.annotation.*;
 import java.util.*;
 @RestController
 public class DiningController{
- private final DiningSessionService service;public DiningController(DiningSessionService service){this.service=service;}
+ private final DiningSessionService service;private final DiningSeatingService seating;
+ public DiningController(DiningSessionService service,DiningSeatingService seating){this.service=service;this.seating=seating;}
+ @PostMapping("/api/v1/tenants/{tenant}/floor/{table}/seat-with-code")
+ public ApiResponse<Seated> seat(@PathVariable UUID tenant,@PathVariable UUID table,@Valid @RequestBody SeatRequest r,Authentication auth){return ApiResponse.success("Guests seated",seating.seat(tenant,table,r,auth));}
  @PostMapping("/api/v1/tenants/{tenant}/floor/{table}/dining-code")
  public ApiResponse<Code> issue(@PathVariable UUID tenant,@PathVariable UUID table,@Valid @RequestBody CodeRequest r,Authentication auth){return ApiResponse.success("Dining code created",service.issue(tenant,table,r,auth));}
  @PostMapping("/api/v1/public/qr/{qr}/dining-session")
