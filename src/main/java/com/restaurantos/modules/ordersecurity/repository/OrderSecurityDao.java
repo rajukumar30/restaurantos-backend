@@ -18,6 +18,10 @@ public class OrderSecurityDao{
  INSERT INTO branch_order_security(tenant_id,branch_id,mode,max_order_amount,max_visit_amount,max_units,updated_by) VALUES(?,?,?,?,?,?,?)
  ON CONFLICT(tenant_id,branch_id) DO UPDATE SET mode=EXCLUDED.mode,max_order_amount=EXCLUDED.max_order_amount,max_visit_amount=EXCLUDED.max_visit_amount,max_units=EXCLUDED.max_units,updated_by=EXCLUDED.updated_by,updated_at=NOW()
  """,tenant,r.branchId(),r.mode(),r.maxOrderAmount(),r.maxVisitAmount(),r.maxUnits(),actor);}
+ public void auditSettings(UUID tenant,Update r,UUID actor){jdbc.update("""
+ INSERT INTO branch_order_security_audit(tenant_id,branch_id,changed_by,mode,max_order_amount,max_visit_amount,max_units)
+ VALUES(?,?,?,?,?,?,?)
+ """,tenant,r.branchId(),actor,r.mode(),r.maxOrderAmount(),r.maxVisitAmount(),r.maxUnits());}
  public Optional<Scope> table(String qr){return jdbc.query("""
  SELECT t.tenant_id,t.branch_id,t.id,v.id FROM restaurant_tables t JOIN tenants n ON n.id=t.tenant_id JOIN branches b ON b.id=t.branch_id AND b.tenant_id=t.tenant_id
  LEFT JOIN table_visits v ON v.table_id=t.id AND v.tenant_id=t.tenant_id AND v.branch_id=t.branch_id AND v.status='OPEN'

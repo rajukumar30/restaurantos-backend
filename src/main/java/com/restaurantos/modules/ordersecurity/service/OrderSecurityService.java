@@ -36,7 +36,7 @@ public class OrderSecurityService{
  private UUID staff(UUID tenant,UUID branch,Authentication auth,String perm){UUID actor=access.requirePermission(auth,tenant,branch,perm);access.requireBranchInTenant(tenant,branch);features.require(tenant,"GUEST_ORDERING");return actor;}
  @Transactional(readOnly=true) public Access publicAccess(String qr){var s=table(qr);return new Access(dao.settings(s.tenant(),s.branch()).mode());}
  @Transactional(readOnly=true) public Settings settings(UUID tenant,UUID branch,Authentication auth){staff(tenant,branch,auth,"floor:read");return dao.settings(tenant,branch);}
- @Transactional public Settings update(UUID tenant,Update r,Authentication auth){UUID actor=staff(tenant,r.branchId(),auth,"floor:manage");if(!access.hasTenantWidePermission(auth,tenant,"staff:manage"))throw forbidden("Owner access required.");if(r.maxVisitAmount().compareTo(r.maxOrderAmount())<0)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Visit limit must cover the order limit.");if("EXPRESS".equals(r.mode())&&!r.acknowledgeRisk())throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Acknowledge Express mode's saved QR risk.");dao.save(tenant,r,actor);return dao.settings(tenant,r.branchId());}
+ @Transactional public Settings update(UUID tenant,Update r,Authentication auth){UUID actor=staff(tenant,r.branchId(),auth,"floor:manage");if(!access.hasTenantWidePermission(auth,tenant,"staff:manage"))throw forbidden("Owner access required.");if("STRICT".equals(r.mode())&&!"STRICT".equals(dao.settings(tenant,r.branchId()).mode()))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Strict ordering is a legacy mode. Choose Scan & Order or Verified Table Ordering.");if(r.maxVisitAmount().compareTo(r.maxOrderAmount())<0)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Visit limit must cover the order limit.");if("EXPRESS".equals(r.mode())&&!r.acknowledgeRisk())throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Acknowledge Express mode's saved QR risk.");dao.save(tenant,r,actor);dao.auditSettings(tenant,r,actor);return dao.settings(tenant,r.branchId());}
  @Transactional public Joined join(String qr){
   if(!sessions.lockQr(qr))throw forbidden("Table unavailable.");var s=table(qr);
   if("SECURE".equals(dao.settings(s.tenant(),s.branch()).mode()))throw forbidden("Enter the dining code to join.");
@@ -94,8 +94,9 @@ public class OrderSecurityService{
    if(!dao.sessionActive(s,x.sessionId()))throw conflict("Guest session expired. Ask guest to resubmit.");
    var receipt=placement.placeChecked(dao.qr(s),parse(x.json()),x.key(),s.visit(),id,x.review().total());
    if(!receipt.orderId().equals(id))throw conflict("Order submission changed.");
-   dining.recordOrder(new Visit(s,x.sessionId(),"OPEN",true),id);
-   dao.verifySession(s,x.sessionId());dao.resolve(s,id,actor,"APPROVED",r.reason().trim());
+   // Approving this order is not proof of device ownership or authority to view the shared bill.
+   dining.recordOrder(new Visit(s,x.sessionId(),"OPEN",false),id);
+   dao.resolve(s,id,actor,"APPROVED",r.reason().trim());
   }else{dao.resolve(s,id,actor,"REJECTED",r.reason().trim());events.publishAfterCommit(new RealtimeEvent(UUID.randomUUID(),"ORDER_STATUS_CHANGED",tenant,r.branchId(),id,1,Instant.now(),Map.of("tableId",s.table().toString())));}
   notify(s,id);return Map.of("status","APPROVE".equals(r.action())?"APPROVED":"REJECTED");
  }
