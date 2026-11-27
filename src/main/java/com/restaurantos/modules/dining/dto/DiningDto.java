@@ -5,7 +5,7 @@ import java.time.Instant;
 import java.util.UUID;
 public final class DiningDto{
  private DiningDto(){}
- public record SeatRequest(@NotNull UUID branchId,@NotNull @Min(1) @Max(50) Integer guests){}
+ public record SeatRequest(@NotNull UUID branchId,@Min(1) @Max(50) Integer guests){}
  public record Seated(com.restaurantos.modules.floor.dto.FloorDto.TableState table,Code diningCode){}
  public record CodeRequest(@NotNull UUID branchId,@NotNull UUID visitId){}
  public record JoinRequest(@NotBlank @Pattern(regexp="[0-9]{6}") String code){}

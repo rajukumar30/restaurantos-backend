@@ -20,7 +20,8 @@ public class OrderSecurityDao{
  """,tenant,r.branchId(),r.mode(),r.maxOrderAmount(),r.maxVisitAmount(),r.maxUnits(),actor);}
  public Optional<Scope> table(String qr){return jdbc.query("""
  SELECT t.tenant_id,t.branch_id,t.id,v.id FROM restaurant_tables t JOIN tenants n ON n.id=t.tenant_id JOIN branches b ON b.id=t.branch_id AND b.tenant_id=t.tenant_id
- LEFT JOIN table_visits v ON v.table_id=t.id AND v.tenant_id=t.tenant_id AND v.branch_id=t.branch_id AND v.status='OPEN' AND v.floor_guest_count IS NOT NULL
+ LEFT JOIN table_visits v ON v.table_id=t.id AND v.tenant_id=t.tenant_id AND v.branch_id=t.branch_id AND v.status='OPEN'
+ AND (v.floor_guest_count IS NOT NULL OR EXISTS (SELECT 1 FROM floor_events e WHERE e.visit_id=v.id AND e.tenant_id=v.tenant_id AND e.branch_id=v.branch_id AND e.table_id=v.table_id AND e.action='SEAT'))
  WHERE t.qr_token=? AND t.is_active AND n.status='ACTIVE' AND b.status='ACTIVE'
  """,(r,i)->new Scope(r.getObject(1,UUID.class),r.getObject(2,UUID.class),r.getObject(3,UUID.class),r.getObject(4,UUID.class)),qr).stream().findFirst();}
  public int unverifiedSessions(UUID visit){return jdbc.queryForObject("SELECT COUNT(*) FROM dining_sessions WHERE visit_id=? AND NOT verified AND revoked_at IS NULL AND expires_at>NOW()",Integer.class,visit);}

@@ -40,7 +40,7 @@ public class OrderSecurityService{
  @Transactional public Joined join(String qr){
   if(!sessions.lockQr(qr))throw forbidden("Table unavailable.");var s=table(qr);
   if("SECURE".equals(dao.settings(s.tenant(),s.branch()).mode()))throw forbidden("Enter the dining code to join.");
-  if(s.visit()==null)throw conflict("Ask staff to seat your group first.");
+  if(s.visit()==null)throw conflict("Ask staff to open your table first.");
   if(dao.unverifiedSessions(s.visit())>=24)throw limit();
   byte[] raw=new byte[32];random.nextBytes(raw);String token=HexFormat.of().formatHex(raw);Instant expiry=Instant.now().plusSeconds(12*3600);
   dao.join(UUID.randomUUID(),s.visit(),hash(token),expiry);return new Joined(token,s.visit(),expiry,false);

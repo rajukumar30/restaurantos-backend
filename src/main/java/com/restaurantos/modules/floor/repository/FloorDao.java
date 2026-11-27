@@ -31,8 +31,8 @@ public class FloorDao {
  public List<TableState> list(UUID tenant,UUID branch){return jdbc.query(STATE+" ORDER BY rt.table_number",this::map,tenant,branch);}
  public Optional<TableState> one(UUID tenant,UUID branch,UUID table){return jdbc.query(STATE+" AND rt.id=?",this::map,tenant,branch,table).stream().findFirst();}
  public boolean lock(UUID tenant,UUID branch,UUID table){return !jdbc.query("SELECT id FROM restaurant_tables WHERE tenant_id=? AND branch_id=? AND id=? FOR UPDATE",(r,i)->r.getObject(1,UUID.class),tenant,branch,table).isEmpty();}
- public void seat(UUID tenant,UUID branch,UUID table,UUID visit,int guests){jdbc.update("INSERT INTO table_visits(id,tenant_id,branch_id,table_id,bill_number,status,floor_guest_count) VALUES(?,?,?,?,?,'OPEN',?)",visit,tenant,branch,table,"B"+visit.toString().replace("-","").substring(0,20).toUpperCase(Locale.ROOT),guests);}
- public void guests(UUID visit,int guests){jdbc.update("UPDATE table_visits SET floor_guest_count=? WHERE id=?",guests,visit);}
+ public void seat(UUID tenant,UUID branch,UUID table,UUID visit,Integer guests){jdbc.update("INSERT INTO table_visits(id,tenant_id,branch_id,table_id,bill_number,status,floor_guest_count) VALUES(?,?,?,?,?,'OPEN',?)",visit,tenant,branch,table,"B"+visit.toString().replace("-","").substring(0,20).toUpperCase(Locale.ROOT),guests);}
+ public void guests(UUID visit,Integer guests){jdbc.update("UPDATE table_visits SET floor_guest_count=? WHERE id=?",guests,visit);}
  public void extend(UUID visit){jdbc.update("UPDATE table_visits SET floor_grace_until=NOW()+INTERVAL '5 minutes',floor_cleaning_started_at=NULL WHERE id=?",visit);}
  public void start(UUID visit){jdbc.update("UPDATE table_visits SET floor_cleaning_started_at=NOW() WHERE id=?",visit);}
  public void close(UUID tenant,UUID branch,UUID table,UUID visit){

@@ -49,6 +49,6 @@ public class FloorServiceImpl implements FloorService{
   events.publishFloorAfterCommit(RealtimeEvent.orderChanged("FLOOR_CHANGED",tenant,branch,table));
   return require(tenant,branch,table);
  }
- private void checkGuests(TableState t,Integer guests){if(guests==null||guests<1||guests>t.capacity())throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Guest count must fit table capacity");}
+ private void checkGuests(TableState t,Integer guests){if(guests!=null&&(guests<1||guests>t.capacity()))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Guest count must fit table capacity");}
  private ResponseStatusException conflict(String message){return new ResponseStatusException(HttpStatus.CONFLICT,message);}
 }

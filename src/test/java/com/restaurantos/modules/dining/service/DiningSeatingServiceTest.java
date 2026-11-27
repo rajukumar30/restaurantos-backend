@@ -24,6 +24,14 @@ class DiningSeatingServiceTest {
   var result=service.seat(tenant,table,new SeatRequest(branch,2),auth);
   assertEquals(visit,result.table().visitId());assertEquals(code,result.diningCode());
  }
+ @Test void opensVisitAndIssuesCodeWithNoGuestCount(){
+  var state=new TableState(table,"01","Table 01",4,true,visit,"OPEN",null,Instant.now(),null,null,0,0,0,0,BigDecimal.ZERO,0,false,false,null,null,null);
+  var code=new Code("123456",visit,Instant.now().plusSeconds(60));
+  when(floor.action(tenant,table,new FloorAction(branch,"SEAT",null,null),auth)).thenReturn(state);
+  when(dining.issue(tenant,table,new CodeRequest(branch,visit),auth)).thenReturn(code);
+  var result=service.seat(tenant,table,new SeatRequest(branch,null),auth);
+  assertNull(result.table().guests());assertEquals(code,result.diningCode());
+ }
  @Test void seatingFailureCannotIssueCode(){
   when(floor.action(any(),any(),any(),any())).thenThrow(new IllegalStateException("Table occupied"));
   assertThrows(IllegalStateException.class,()->service.seat(tenant,table,new SeatRequest(branch,2),auth));verifyNoInteractions(dining);
