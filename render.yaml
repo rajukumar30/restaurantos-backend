@@ -1,0 +1,32 @@
+# Render Blueprint for the RestaurantOS Spring Boot API.
+# Secrets are entered in the Render Dashboard; never commit production credentials.
+services:
+  - type: web
+    name: restaurantos-backend
+    runtime: docker
+    branch: chore/bootstrap
+    region: singapore
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /actuator/health
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_USERNAME
+        sync: false
+      - key: DATABASE_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://restaurantos-frontend-git-5b3cfe-hypertextrjgmailcoms-projects.vercel.app
+      - key: PLATFORM_ADMIN_EMAIL
+        sync: false
+      - key: PLATFORM_ADMIN_PASSWORD
+        sync: false
+      - key: PLATFORM_ADMIN_NAME
+        value: Platform Administrator
+      - key: JWT_EXPIRATION_MINUTES
+        value: "60"

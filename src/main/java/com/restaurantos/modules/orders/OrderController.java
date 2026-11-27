@@ -1,0 +1,75 @@
+package com.restaurantos.modules.orders;
+
+import com.restaurantos.modules.ordersecurity.service.OrderSecurityService;
+import org.springframework.transaction.annotation.Transactional;
+import com.restaurantos.common.api.ApiResponse;
+import com.restaurantos.modules.orders.dto.OrderDto.*;
+import com.restaurantos.modules.orders.service.OrderQueryService;
+import jakarta.validation.Valid;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.UUID;
+import java.time.LocalDate;
+import org.springframework.format.annotation.DateTimeFormat;
+
+@RestController
+public class OrderController {
+    private final OrderQueryService orderQueries;
+    private final OrderSecurityService ordering;
+
+    public OrderController(OrderQueryService orderQueries,OrderSecurityService ordering){
+        this.orderQueries=orderQueries;this.ordering=ordering;
+    }
+
+    @Transactional
+    @PostMapping("/api/v1/public/qr/{qrToken}/orders")
+    public ApiResponse<OrderReceipt> placeQrOrder(@PathVariable String qrToken,
+            @Valid @RequestBody PlaceOrderRequest request,
+            @RequestHeader(value="Idempotency-Key",required=false) String idempotencyKey,
+            @RequestHeader(value="X-Dining-Session",required=false) String session,Authentication authentication){
+        return ApiResponse.success("Order submitted",ordering.submit(qrToken,session,request,idempotencyKey));
+    }
+
+    @GetMapping("/api/v1/public/qr/{qrToken}/orders/{orderId}")
+    public ApiResponse<PublicOrderStatus> getPublicOrderStatus(@PathVariable String qrToken,
+            @PathVariable UUID orderId,Authentication authentication){
+        return ApiResponse.success("Order status loaded",orderQueries.publicStatus(qrToken,orderId));
+    }
+
+    @GetMapping("/api/v1/tenants/{tenantId}/orders")
+    public ApiResponse<List<OrderSummary>> listOrders(@PathVariable UUID tenantId,
+            @RequestParam UUID branchId,@RequestParam(defaultValue="false") boolean live,Authentication authentication){
+        return ApiResponse.success("Orders loaded",live?orderQueries.listLive(tenantId,branchId,authentication):orderQueries.list(tenantId,branchId,authentication));
+    }
+
+    @GetMapping("/api/v1/tenants/{tenantId}/orders/live")
+    public ApiResponse<List<OrderSummary>> listLiveOrders(@PathVariable UUID tenantId,
+            @RequestParam UUID branchId,Authentication authentication){
+        return ApiResponse.success("Live orders loaded",orderQueries.listLive(tenantId,branchId,authentication));
+    }
+
+    @GetMapping("/api/v1/tenants/{tenantId}/orders/workspace")
+    public ApiResponse<OrderWorkspacePage> workspace(@PathVariable UUID tenantId,@RequestParam UUID branchId,
+     @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate date,
+     @RequestParam(defaultValue="day") String mode,@RequestParam(defaultValue="ALL") String status,
+     @RequestParam(defaultValue="") String search,@RequestParam(defaultValue="1") int page,
+     @RequestParam(defaultValue="20") int size,Authentication authentication){
+     return ApiResponse.success("Order workspace loaded",orderQueries.workspace(tenantId,new OrderWorkspaceQuery(branchId,date,mode,status,search,page,size),authentication));
+    }
+
+    @GetMapping("/api/v1/tenants/{tenantId}/orders/{orderId}")
+    public ApiResponse<OrderSummary> getOrder(@PathVariable UUID tenantId,
+            @PathVariable UUID orderId,@RequestParam UUID branchId,Authentication authentication){
+        return ApiResponse.success("Order loaded",orderQueries.get(tenantId,branchId,orderId,authentication));
+    }
+
+    @PatchMapping("/api/v1/tenants/{tenantId}/orders/{orderId}/status")
+    public ApiResponse<OrderStatusUpdated> updateStatus(@PathVariable UUID tenantId,
+            @PathVariable UUID orderId,@Valid @RequestBody UpdateOrderStatusRequest request,
+            Authentication authentication){
+        return ApiResponse.success("Order status updated",orderQueries.updateStatus(tenantId,orderId,request,authentication));
+    }
+
+}
