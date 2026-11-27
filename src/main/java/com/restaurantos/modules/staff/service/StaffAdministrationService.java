@@ -8,4 +8,5 @@ import java.util.UUID;
 public interface StaffAdministrationService {
     List<StaffMember> list(UUID tenantId, UUID branchId, Authentication auth);
     StaffCreated invite(UUID tenantId, InviteStaffRequest request, Authentication auth);
+    StaffMember update(UUID tenantId,UUID userId,UpdateStaffRequest request,Authentication auth);
 }

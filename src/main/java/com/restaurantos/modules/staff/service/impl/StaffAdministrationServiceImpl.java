@@ -75,4 +75,21 @@ public class StaffAdministrationServiceImpl implements StaffAdministrationServic
         dao.grantPermissions(roleId, permissions);
         return roleId;
     }
+    @Override @Transactional
+    public StaffMember update(UUID tenantId,UUID userId,UpdateStaffRequest req,Authentication auth){
+        UUID actor=access.requirePermission(auth,tenantId,req.branchId(),"staff:manage");
+        if(!access.hasTenantWidePermission(auth,tenantId,"staff:manage")||userId.equals(actor))
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Only restaurant owners can edit other staff accounts.");
+        access.requireBranchInTenant(tenantId,req.branchId());
+        String role=req.roleKey().trim().toUpperCase(Locale.ROOT);
+        String status=req.accountStatus().trim().toUpperCase(Locale.ROOT);
+        if(!ROLES.contains(role)||!Set.of("ACTIVE","INACTIVE").contains(status))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Select a valid staff role and account status.");
+        UUID membership=dao.lockEditableMembership(tenantId,req.branchId(),userId).orElseThrow(()->
+            new ResponseStatusException(HttpStatus.FORBIDDEN,"This account is protected, shared across workspaces, or not assigned to this branch."));
+        UUID roleId=ensureRole(tenantId,role);
+        dao.updateStaff(tenantId,req.branchId(),membership,userId,req.name().trim(),req.phone(),status,roleId);
+        return dao.list(tenantId,req.branchId(),false).stream().filter(p->p.userId().equals(userId)).findFirst()
+            .orElseThrow(()->new ResponseStatusException(HttpStatus.CONFLICT,"Staff account could not be refreshed."));
+    }
 }

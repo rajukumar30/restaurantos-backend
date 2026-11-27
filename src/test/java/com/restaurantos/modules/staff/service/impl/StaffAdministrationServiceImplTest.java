@@ -1,14 +1,14 @@
 package com.restaurantos.modules.staff.service.impl;
 
 import com.restaurantos.modules.staff.TenantAccessService;
-import com.restaurantos.modules.staff.dto.StaffAdminDto.InviteStaffRequest;
+import com.restaurantos.modules.staff.dto.StaffAdminDto.*;
 import com.restaurantos.modules.staff.repository.StaffAdministrationDao;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.server.ResponseStatusException;
-import java.util.UUID;
+import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -46,5 +46,27 @@ class StaffAdministrationServiceImplTest {
         var sequence = inOrder(access,dao);
         sequence.verify(access).requirePermission(auth,tenant,branch,"staff:read");
         sequence.verify(dao).list(tenant,branch,false);
+    }
+    @Test void editRequiresTenantWideManagement(){
+        UUID user=UUID.randomUUID();
+        assertEquals(HttpStatus.FORBIDDEN,assertThrows(ResponseStatusException.class,()->service.update(tenant,user,new UpdateStaffRequest(branch,"Staff",null,"WAITER","INACTIVE"),auth)).getStatusCode());
+        verifyNoInteractions(dao);
+    }
+    @Test void protectedAccountCannotBeEdited(){
+        when(access.hasTenantWidePermission(auth,tenant,"staff:manage")).thenReturn(true);
+        UUID user=UUID.randomUUID();
+        when(dao.lockEditableMembership(tenant,branch,user)).thenReturn(Optional.empty());
+        assertEquals(HttpStatus.FORBIDDEN,assertThrows(ResponseStatusException.class,()->service.update(tenant,user,new UpdateStaffRequest(branch,"Staff",null,"WAITER","INACTIVE"),auth)).getStatusCode());
+        verify(dao,never()).updateStaff(any(),any(),any(),any(),any(),any(),any(),any());
+    }
+    @Test void editsSingleBranchAccountAndUsesInactiveStatus(){
+        when(access.hasTenantWidePermission(auth,tenant,"staff:manage")).thenReturn(true);
+        UUID user=UUID.randomUUID(),membership=UUID.randomUUID(),role=UUID.randomUUID();
+        when(dao.lockEditableMembership(tenant,branch,user)).thenReturn(Optional.of(membership));
+        when(dao.findRole(tenant,"WAITER")).thenReturn(role);
+        var result=new StaffMember(user,"Staff","staff@example.com",null,"INACTIVE","Waiter","Main branch");
+        when(dao.list(tenant,branch,false)).thenReturn(List.of(result));
+        assertEquals(result,service.update(tenant,user,new UpdateStaffRequest(branch,"Staff",null,"WAITER","INACTIVE"),auth));
+        verify(dao).updateStaff(tenant,branch,membership,user,"Staff",null,"INACTIVE",role);
     }
 }

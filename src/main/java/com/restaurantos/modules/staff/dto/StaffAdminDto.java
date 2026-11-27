@@ -16,4 +16,7 @@ public final class StaffAdminDto {
                               String accountStatus, String roles, String branches) {}
     public record StaffCreated(UUID userId, UUID tenantUserId, UUID branchId,
                                String roleKey, String status) {}
+    public record UpdateStaffRequest(@NotNull UUID branchId,
+        @NotBlank @Size(max=150) String name,@Size(max=20) String phone,
+        @NotBlank String roleKey,@NotBlank String accountStatus) {}
 }

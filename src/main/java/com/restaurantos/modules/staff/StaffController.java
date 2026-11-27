@@ -27,4 +27,9 @@ public class StaffController {
                                             Authentication authentication) {
         return ApiResponse.success("Staff account created", service.invite(tenantId, request, authentication));
     }
+    @PatchMapping("/{userId}")
+    public ApiResponse<StaffMember> update(@PathVariable UUID tenantId,@PathVariable UUID userId,
+         @Valid @RequestBody UpdateStaffRequest request,Authentication authentication){
+        return ApiResponse.success("Staff updated",service.update(tenantId,userId,request,authentication));
+    }
 }

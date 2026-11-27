@@ -72,4 +72,27 @@ public class StaffAdministrationDao {
         jdbc.update("INSERT INTO user_roles (tenant_id,tenant_user_id,role_id,branch_id) VALUES (?,?,?,?)",
             tenantId, tenantUserId, roleId, branchId);
     }
+    /** Only single-tenant, single-branch operational accounts are editable through this workflow. */
+    public Optional<UUID> lockEditableMembership(UUID tenant,UUID branch,UUID user){
+        return jdbc.query("""
+            SELECT tu.id FROM tenant_users tu JOIN app_users u ON u.id=tu.user_id
+            JOIN branch_users bu ON bu.tenant_id=tu.tenant_id AND bu.tenant_user_id=tu.id
+            WHERE tu.tenant_id=? AND bu.branch_id=? AND u.id=? AND bu.status='ACTIVE'
+              AND u.status IN ('ACTIVE','INACTIVE') AND tu.status IN ('ACTIVE','INACTIVE')
+              AND NOT EXISTS (SELECT 1 FROM platform_admins pa WHERE pa.user_id=u.id)
+              AND (SELECT COUNT(*) FROM tenant_users other WHERE other.user_id=u.id)=1
+              AND (SELECT COUNT(*) FROM branch_users other WHERE other.tenant_id=tu.tenant_id AND other.tenant_user_id=tu.id)=1
+              AND (SELECT COUNT(*) FROM user_roles ur WHERE ur.tenant_id=tu.tenant_id AND ur.tenant_user_id=tu.id)=1
+              AND EXISTS (SELECT 1 FROM user_roles ur JOIN roles r ON r.id=ur.role_id AND r.tenant_id=ur.tenant_id
+                 WHERE ur.tenant_id=tu.tenant_id AND ur.tenant_user_id=tu.id AND ur.branch_id=bu.branch_id
+                   AND r.role_key IN ('MANAGER','KITCHEN','CASHIER','WAITER','STAFF'))
+            FOR UPDATE OF tu,u
+            """,(rs,row)->rs.getObject(1,UUID.class),tenant,branch,user).stream().findFirst();
+    }
+    public void updateStaff(UUID tenant,UUID branch,UUID membership,UUID user,String name,String phone,String status,UUID role){
+        jdbc.update("UPDATE app_users SET name=?,phone=?,status=?,updated_at=NOW() WHERE id=?",name,phone,status,user);
+        // Inactive membership blocks tenant permissions even for already-issued JWTs.
+        jdbc.update("UPDATE tenant_users SET status=?,updated_at=NOW() WHERE tenant_id=? AND id=? AND user_id=?",status,tenant,membership,user);
+        jdbc.update("UPDATE user_roles SET role_id=? WHERE tenant_id=? AND tenant_user_id=? AND branch_id=?",role,tenant,membership,branch);
+    }
 }
